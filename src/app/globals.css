@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-cream text-[#16324F] font-sans text-[15px];
+}
+
+.panel {
+  @apply bg-white border border-border rounded-2xl p-5 shadow-sm;
+}
+.panel-title {
+  @apply text-sm font-bold text-navy mb-3;
+}
+.field-label {
+  @apply block text-xs font-bold text-navy mb-1.5;
+}
+.field {
+  @apply w-full border border-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-50;
+}
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-lg px-5 py-2.5 transition disabled:opacity-50;
+}
+.chip {
+  @apply inline-block border border-border bg-white text-muted text-sm font-semibold px-4 py-1.5 rounded-full hover:border-teal-600 hover:text-teal-700 transition;
+}
+.chip-active {
+  @apply bg-navy border-navy text-white;
+}
+.nav-tab {
+  @apply px-4 py-2.5 rounded-t-lg text-blue-200 hover:text-white hover:bg-white/5;
+}
