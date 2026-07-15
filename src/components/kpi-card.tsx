@@ -13,10 +13,10 @@ export function KpiCard({
 }) {
   const display = Number.isFinite(value) ? value.toFixed(decimals) : '-';
   return (
-    <div className="panel">
-      <div className="text-xs font-semibold text-muted mb-1.5">{label}</div>
-      <div className={`text-2xl font-extrabold tabular-nums ${tone === 'danger' ? 'text-red-700' : 'text-navy'}`}>
-        {display} <small className="text-sm font-semibold text-muted">{unit}</small>
+    <div className={`panel border-l-4 ${tone === 'danger' ? 'border-l-red-600' : 'border-l-teal-700'}`}>
+      <div className="mb-1.5 text-xs font-bold text-slate-500">{label}</div>
+      <div className={`text-2xl font-extrabold tabular-nums ${tone === 'danger' ? 'text-red-700' : 'text-slate-950'}`}>
+        {display} <small className="text-sm font-semibold text-slate-500">{unit}</small>
       </div>
     </div>
   );

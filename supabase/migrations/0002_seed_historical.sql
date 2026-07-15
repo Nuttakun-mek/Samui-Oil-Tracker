@@ -1,5 +1,5 @@
 -- Seed: historical data extracted from original Excel trackers
--- (สมุย/พะงัน มี.ค. 2569, เกาะเต่า 1-6 เม.ย. 2569)
+-- (ข้อมูลย้อนหลังตามรหัสพื้นที่เดิม: samui/phangan/koh_tao)
 
 insert into fuel_records
   (station_id, record_date, opening_liters, received_liters, plan_received_liters,

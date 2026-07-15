@@ -4,30 +4,63 @@
 @tailwind utilities;
 
 body {
-  @apply bg-cream text-[#16324F] font-sans text-[15px];
+  @apply bg-slate-50 text-slate-900 font-sans text-[15px] antialiased;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2;
 }
 
 .panel {
-  @apply bg-white border border-border rounded-2xl p-5 shadow-sm;
+  @apply bg-white border border-slate-200 rounded-lg p-5 shadow-sm;
 }
 .panel-title {
-  @apply text-sm font-bold text-navy mb-3;
+  @apply text-sm font-bold text-slate-900 mb-3;
 }
 .field-label {
-  @apply block text-xs font-bold text-navy mb-1.5;
+  @apply block text-xs font-bold text-slate-700 mb-1.5;
 }
 .field {
-  @apply w-full border border-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-50;
+  @apply w-full min-h-10 border border-slate-300 rounded-md px-3 py-2 text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-50 disabled:bg-slate-100 disabled:text-slate-500;
 }
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-lg px-5 py-2.5 transition disabled:opacity-50;
+  @apply inline-flex min-h-10 items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-bold rounded-md px-4 py-2 transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+.btn-secondary {
+  @apply inline-flex min-h-10 items-center justify-center gap-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-sm font-bold rounded-md px-4 py-2 transition disabled:cursor-not-allowed disabled:opacity-50;
 }
 .chip {
-  @apply inline-block border border-border bg-white text-muted text-sm font-semibold px-4 py-1.5 rounded-full hover:border-teal-600 hover:text-teal-700 transition;
+  @apply inline-block border border-slate-300 bg-white text-slate-600 text-sm font-semibold px-3 py-1.5 rounded-md hover:border-teal-600 hover:text-teal-700 transition;
 }
 .chip-active {
-  @apply bg-navy border-navy text-white;
+  @apply bg-slate-900 border-slate-900 text-white;
 }
 .nav-tab {
-  @apply px-4 py-2.5 rounded-t-lg text-blue-200 hover:text-white hover:bg-white/5;
+  @apply inline-flex min-h-11 items-center gap-2 border-b-2 border-transparent px-3 py-3 text-sm font-bold text-slate-300 hover:border-teal-300 hover:text-white;
+}
+.nav-tab-active {
+  @apply border-teal-300 text-white;
+}
+.table-shell {
+  @apply overflow-x-auto rounded-lg border border-slate-200 bg-white;
+}
+.table-header {
+  @apply bg-slate-900 text-left text-xs font-bold uppercase tracking-wide text-white;
+}
+.page-kicker {
+  @apply text-xs font-extrabold uppercase tracking-wide text-teal-700;
+}
+.page-title {
+  @apply text-2xl font-extrabold text-slate-950;
+}
+.page-subtitle {
+  @apply mt-1 text-sm leading-6 text-slate-600;
 }

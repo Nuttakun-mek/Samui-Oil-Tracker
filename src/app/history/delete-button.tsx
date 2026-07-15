@@ -10,7 +10,7 @@ export function DeleteButton({ id }: { id: string }) {
 
   return (
     <button
-      className="text-xs font-bold text-red-700 border border-red-100 bg-red-50 rounded-md px-2.5 py-1 hover:bg-red-100 disabled:opacity-50"
+      className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
       disabled={isPending}
       onClick={() => {
         if (!confirm('ยืนยันลบข้อมูลรายการนี้? (เฉพาะ admin)')) return;

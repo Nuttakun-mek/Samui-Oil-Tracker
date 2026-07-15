@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import './globals.css';
 import { createClient } from '@/lib/supabase/server';
-import { LogoutButton } from '@/components/logout-button';
+import { AppHeader } from '@/components/app-header';
+import { APP_NAV_ITEMS, canAccessPage, normalizeRole } from '@/lib/auth/page-access';
 
 export const metadata: Metadata = {
-  title: 'ระบบติดตามการใช้น้ำมัน 3 เกาะ | PEA',
+  title: 'ระบบติดตามการใช้น้ำมัน 3 พื้นที่ | PEA',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -13,39 +13,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    : { data: null };
+  const role = normalizeRole(profile?.role);
+  const navItems = APP_NAV_ITEMS.filter((item) => canAccessPage(role, item.id));
 
   return (
     <html lang="th">
-      <body>
-        {user && (
-          <header className="bg-navy text-white px-6 pt-4">
-            <div className="flex items-end justify-between flex-wrap gap-3 pb-3">
-              <div>
-                <h1 className="text-base font-bold">ระบบติดตามการใช้น้ำมันเชื้อเพลิง 3 เกาะ</h1>
-                <p className="text-xs text-blue-200 mt-0.5">การไฟฟ้าส่วนภูมิภาค · สมุย · พะงัน (ลิปะน้อย) · เกาะเต่า</p>
-              </div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="text-blue-200">{user.email}</span>
-                <LogoutButton />
-              </div>
-            </div>
-            <nav className="flex gap-1 text-sm font-semibold">
-              <Link href="/dashboard" className="nav-tab">
-                แดชบอร์ด
-              </Link>
-              <Link href="/entry" className="nav-tab">
-                บันทึกข้อมูลรายวัน
-              </Link>
-              <Link href="/history" className="nav-tab">
-                ประวัติข้อมูล
-              </Link>
-              <Link href="/settings" className="nav-tab">
-                ตั้งค่า
-              </Link>
-            </nav>
-          </header>
-        )}
-        <main className="max-w-6xl mx-auto px-6 py-7">{children}</main>
+      <body suppressHydrationWarning>
+        {user && <AppHeader email={user.email ?? 'ผู้ใช้งาน'} navItems={navItems} />}
+        <main className={user ? 'mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:py-8' : ''}>{children}</main>
       </body>
     </html>
   );

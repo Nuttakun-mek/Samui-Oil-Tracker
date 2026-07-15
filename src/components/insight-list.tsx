@@ -40,12 +40,16 @@ export function InsightList({ stations, records }: { stations: Station[]; record
     items.push({ level: 'ok', text: 'ทุกพื้นที่มีระดับน้ำมันอยู่ในเกณฑ์ปกติ ไม่มีจุดที่ต้องเฝ้าระวังในขณะนี้' });
   }
 
-  const toneClass = { ok: 'bg-teal-50 text-navy', warn: 'bg-amber-50 text-amber-900', danger: 'bg-red-50 text-red-900' };
+  const toneClass = {
+    ok: 'border-teal-200 bg-teal-50 text-slate-900',
+    warn: 'border-amber-200 bg-amber-50 text-amber-950',
+    danger: 'border-red-200 bg-red-50 text-red-950',
+  };
 
   return (
     <ul className="flex flex-col gap-2.5">
       {items.map((it, i) => (
-        <li key={i} className={`text-sm rounded-lg px-3 py-2.5 ${toneClass[it.level]}`}>
+        <li key={i} className={`rounded-lg border px-3 py-2.5 text-sm leading-6 ${toneClass[it.level]}`}>
           {it.text}
         </li>
       ))}

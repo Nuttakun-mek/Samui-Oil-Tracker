@@ -5,3 +5,8 @@ node_modules
 .vercel
 .DS_Store
 *.tsbuildinfo
+.next-dev-*.log
+
+# Local operational data exports
+database_import_source.xlsx
+supabase/import_historical_database_3stations.sql

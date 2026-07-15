@@ -20,22 +20,30 @@ export function TankGauge({
   }[status];
 
   return (
-    <div className="panel flex items-center gap-4">
-      <div className="relative w-14 h-28 border-2 border-navy rounded-md overflow-hidden bg-white shrink-0">
-        <div
-          className="absolute bottom-0 left-0 w-full transition-all duration-500"
-          style={{ height: `${clamped}%`, background: fillColor }}
-        />
-      </div>
-      <div className="min-w-0">
-        <div className="text-xs font-bold uppercase tracking-wide text-muted mb-1">{label}</div>
-        <div className="text-3xl font-extrabold text-navy tabular-nums">{clamped.toFixed(0)}%</div>
-        <div className="text-xs text-muted tabular-nums mt-1">
-          {Math.round(liters).toLocaleString('th-TH')} / {Math.round(capacity).toLocaleString('th-TH')} ลิตร
+    <div className="panel">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-extrabold leading-5 text-slate-950">{label}</div>
+          <div className="mt-0.5 text-xs text-slate-500">ความจุ {Math.round(capacity).toLocaleString('th-TH')} ลิตร</div>
         </div>
-        <span className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${statusClass}`}>
+        <span className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold ${statusClass}`}>
           {statusText}
         </span>
+      </div>
+
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div className="text-3xl font-extrabold text-slate-950 tabular-nums">{clamped.toFixed(0)}%</div>
+        <div className="text-right text-xs text-slate-500 tabular-nums">
+          <div className="font-bold text-slate-700">{Math.round(liters).toLocaleString('th-TH')}</div>
+          <div>ลิตรคงเหลือ</div>
+        </div>
+      </div>
+
+      <div className="h-3 overflow-hidden rounded-md bg-slate-100">
+        <div
+          className="h-full rounded-md transition-all duration-500"
+          style={{ width: `${clamped}%`, background: fillColor }}
+        />
       </div>
     </div>
   );

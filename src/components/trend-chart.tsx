@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 
 const COLORS: Record<string, string> = {
   samui: '#0E7C86',
-  phangan: '#5B3FA0',
+  phangan: '#2563EB',
   koh_tao: '#C97A0C',
 };
 
@@ -21,10 +21,10 @@ export function TrendChart({ data }: { data: Series[] }) {
   const dates = Array.from(dateSet).sort();
 
   const merged = dates.map((date) => {
-    const row: Record<string, string | number> = { date };
+    const row: Record<string, string | number | null> = { date };
     data.forEach((s) => {
       const point = s.points.find((p) => p.date === date);
-      row[s.id] = point ? point.value : NaN;
+      row[s.id] = point ? point.value : null;
     });
     return row;
   });
@@ -33,11 +33,11 @@ export function TrendChart({ data }: { data: Series[] }) {
     <div style={{ width: '100%', height: 280 }}>
       <ResponsiveContainer>
         <LineChart data={merged} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke="#EEEAE0" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={30} />
-          <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => v.toLocaleString('th-TH')} width={56} />
+          <CartesianGrid stroke="#E2E8F0" vertical={false} />
+          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748B' }} minTickGap={30} />
+          <YAxis tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(v) => v.toLocaleString('th-TH')} width={56} />
           <Tooltip formatter={(v: number) => v.toLocaleString('th-TH') + ' ลิตร'} />
-          <Legend />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
           {data.map((s) => (
             <Line
               key={s.id}
@@ -47,7 +47,7 @@ export function TrendChart({ data }: { data: Series[] }) {
               stroke={COLORS[s.id] ?? '#0E7C86'}
               strokeWidth={2}
               dot={false}
-              connectNulls
+              connectNulls={false}
             />
           ))}
         </LineChart>

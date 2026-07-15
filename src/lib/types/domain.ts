@@ -4,9 +4,9 @@ export const STATION_IDS = ['samui', 'phangan', 'koh_tao'] as const;
 export type StationId = (typeof STATION_IDS)[number];
 
 export const STATION_LABEL: Record<StationId, string> = {
-  samui: 'เกาะสมุย',
-  phangan: 'เกาะพะงัน (ลิปะน้อย)',
-  koh_tao: 'เกาะเต่า',
+  samui: 'สถานีไฟฟ้าสมุย 1 (บ้านพังกา)',
+  phangan: 'พื้นที่ติดตั้งเครื่องกำเนิดไฟฟ้าชั่วคราว ต.ลิปะน้อย',
+  koh_tao: 'โรงจักร เกาะเต่า',
 };
 
 export interface Station {
@@ -28,6 +28,11 @@ export interface FuelRecord {
   dispatched_namsaeng: number | null;
   dispatched_kfp: number | null;
   closing_liters: number;
+  employee_code: string | null;
+  record_source: 'manual' | 'upload' | 'database';
+  source_file_name: string | null;
+  source_sheet_name: string | null;
+  source_note: string | null;
   note: string | null;
   created_by: string | null;
   updated_by: string | null;
@@ -46,6 +51,7 @@ export const fuelRecordFormSchema = z
     dispatched_liters: z.coerce.number().min(0).default(0),
     dispatched_namsaeng: z.coerce.number().min(0).optional(),
     dispatched_kfp: z.coerce.number().min(0).optional(),
+    employee_code: z.string().trim().min(1, 'กรุณากรอกรหัสพนักงาน').max(50, 'รหัสพนักงานยาวเกินไป'),
     note: z.string().max(500).optional(),
   })
   .refine(

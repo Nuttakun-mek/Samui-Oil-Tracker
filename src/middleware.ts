@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { canAccessPath, defaultLandingPath, normalizeRole } from '@/lib/auth/page-access';
 
 // รัน middleware นี้ทุก request เพื่อ refresh Supabase auth session
 // และ redirect ผู้ใช้ที่ยังไม่ login ออกจากหน้าที่ต้อง auth
@@ -40,6 +41,18 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
+  }
+
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    const role = normalizeRole(profile?.role);
+
+    if (!canAccessPath(role, request.nextUrl.pathname)) {
+      const url = request.nextUrl.clone();
+      url.pathname = defaultLandingPath(role);
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

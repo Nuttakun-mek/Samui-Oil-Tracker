@@ -1,5 +1,5 @@
 -- ============================================================
--- Oil Tracker — 3 เกาะ (สมุย / พะงัน / เกาะเต่า)
+-- Oil Tracker — 3 พื้นที่ (บ้านพังกา / ลิปะน้อย / โรงจักรเกาะเต่า)
 -- Initial schema: stations, profiles, access, fuel_records, audit
 -- ============================================================
 
@@ -16,9 +16,9 @@ create table stations (
 );
 
 insert into stations (id, name, tank_capacity_liters, low_stock_days, has_dispatch_breakdown) values
-  ('samui',   'เกาะสมุย',              150000, 5, false),
-  ('phangan', 'เกาะพะงัน (ลิปะน้อย)', 150000, 5, false),
-  ('koh_tao', 'เกาะเต่า',              200000, 5, true);
+  ('samui',   'สถานีไฟฟ้าสมุย 1 (บ้านพังกา)',              150000, 5, false),
+  ('phangan', 'พื้นที่ติดตั้งเครื่องกำเนิดไฟฟ้าชั่วคราว ต.ลิปะน้อย', 150000, 5, false),
+  ('koh_tao', 'โรงจักร เกาะเต่า',              200000, 5, true);
 
 -- ---------- profiles (extends auth.users) ----------
 create table profiles (
@@ -64,6 +64,7 @@ create table fuel_records (
   dispatched_namsaeng numeric,                          -- เกาะเต่าเท่านั้น
   dispatched_kfp numeric,                               -- เกาะเต่าเท่านั้น
   closing_liters numeric not null default 0,
+  employee_code text,
   note text,
   created_by uuid references profiles(id),
   updated_by uuid references profiles(id),
@@ -147,17 +148,63 @@ create policy stations_select on stations for select using (auth.uid() is not nu
 create policy stations_write on stations for all using (public.is_admin()) with check (public.is_admin());
 
 -- profiles: users see their own row; admins see all
-create policy profiles_select_self on profiles for select using (id = auth.uid() or public.is_admin());
-create policy profiles_update_self on profiles for update using (id = auth.uid() or public.is_admin());
+create policy profiles_select_self on profiles for select to authenticated using (id = (select auth.uid()) or public.is_admin());
+create policy profiles_update_self on profiles for update to authenticated
+  using (id = (select auth.uid()) or public.is_admin())
+  with check (id = (select auth.uid()) or public.is_admin());
+
+-- Users may update their own display name. Role changes go through an admin-only RPC below.
+revoke update on profiles from anon, authenticated;
+grant update (full_name) on profiles to authenticated;
 
 -- profile_station_access: admins manage; users can read their own assignment
 create policy access_select on profile_station_access for select using (profile_id = auth.uid() or public.is_admin());
 create policy access_write on profile_station_access for all using (public.is_admin()) with check (public.is_admin());
 
+create function public.admin_update_user_permissions(
+  target_profile_id uuid,
+  target_role text,
+  target_station_ids text[]
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'admin permission required';
+  end if;
+
+  if target_role not in ('admin', 'field') then
+    raise exception 'invalid role';
+  end if;
+
+  update public.profiles
+  set role = target_role
+  where id = target_profile_id;
+
+  delete from public.profile_station_access
+  where profile_id = target_profile_id;
+
+  if target_station_ids is not null and cardinality(target_station_ids) > 0 then
+    insert into public.profile_station_access (profile_id, station_id)
+    select target_profile_id, station_id
+    from unnest(target_station_ids) as station_id
+    where exists (select 1 from public.stations where id = station_id)
+    on conflict do nothing;
+  end if;
+end;
+$$;
+
+revoke all on function public.admin_update_user_permissions(uuid, text, text[]) from public;
+grant execute on function public.admin_update_user_permissions(uuid, text, text[]) to authenticated;
+
 -- fuel_records: read/write only for stations the user has access to
 create policy fuel_records_select on fuel_records for select using (public.has_station_access(station_id));
 create policy fuel_records_insert on fuel_records for insert with check (public.has_station_access(station_id));
-create policy fuel_records_update on fuel_records for update using (public.has_station_access(station_id));
+create policy fuel_records_update on fuel_records for update to authenticated
+  using (public.has_station_access(station_id))
+  with check (public.has_station_access(station_id));
 create policy fuel_records_delete on fuel_records for delete using (public.is_admin());
 
 -- audit log: admin-only read, no direct writes (trigger uses security definer)
