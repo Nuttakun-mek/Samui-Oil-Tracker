@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { createClient } from '@/lib/supabase/server';
 import { AppHeader } from '@/components/app-header';
+import { AppFooter } from '@/components/app-footer';
 import { APP_NAV_ITEMS, canAccessPage, normalizeRole } from '@/lib/auth/page-access';
 
 export const metadata: Metadata = {
-  title: 'ระบบติดตามการใช้น้ำมัน 3 พื้นที่ | PEA',
+  title: 'ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุย เกาะพะงัน และเกาะเต่า | Island Oil Tracker',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -22,8 +23,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="th">
       <body suppressHydrationWarning>
-        {user && <AppHeader email={user.email ?? 'ผู้ใช้งาน'} navItems={navItems} />}
-        <main className={user ? 'mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:py-8' : ''}>{children}</main>
+        {user ? (
+          <div className="flex min-h-screen flex-col">
+            <AppHeader email={user.email ?? 'ผู้ใช้งาน'} navItems={navItems} />
+            <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+            <AppFooter />
+          </div>
+        ) : children}
       </body>
     </html>
   );

@@ -575,7 +575,7 @@ export function ImportRecordsPanel() {
             type="checkbox"
             checked={forceSelectedStation}
             onChange={(event) => setForceSelectedStation(event.target.checked)}
-            className="h-4 w-4 accent-teal-600"
+            className="h-4 w-4 accent-brand-600"
           />
           <span>ใช้สถานที่ที่เลือกกับทุก record ในไฟล์นี้</span>
         </label>
@@ -669,7 +669,7 @@ export function ImportRecordsPanel() {
               {rows.length > 20 && <span>แสดง 20 แถวแรกจาก {rows.length.toLocaleString('th-TH')} record</span>}
             </div>
             <div className="table-shell">
-            <table className="min-w-[1100px] w-full text-xs">
+            <table className="w-full min-w-[1320px] text-sm">
               <thead>
                 <tr className="table-header">
                   <th className="px-3 py-2 text-left">แถว</th>
@@ -697,7 +697,7 @@ export function ImportRecordsPanel() {
                             <input
                               value={row[header] ?? ''}
                               onChange={(event) => updateRow(index, header, event.target.value)}
-                              className="h-8 w-full min-w-28 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                              className="h-8 w-full min-w-28 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                             />
                           </td>
                         ))}

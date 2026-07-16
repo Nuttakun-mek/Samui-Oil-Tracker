@@ -21,11 +21,11 @@ export function TankGauge({
     : (daysRemaining !== null && daysRemaining < lowStockDays * 1.5) || clamped < 35
       ? 'warn'
       : 'ok';
-  const fillColor = { ok: '#0E7C86', warn: '#C97A0C', danger: '#B23A1B' }[status];
+  const fillColor = { ok: '#722257', warn: '#C69214', danger: '#B23A1B' }[status];
   const statusText = { ok: 'ปกติ', warn: 'เฝ้าระวัง', danger: 'วิกฤต' }[status];
   const statusClass = {
-    ok: 'bg-emerald-50 text-emerald-700',
-    warn: 'bg-amber-50 text-amber-700',
+    ok: 'bg-brand-50 text-brand-700',
+    warn: 'bg-gold-50 text-gold-700',
     danger: 'bg-red-50 text-red-700',
   }[status];
 

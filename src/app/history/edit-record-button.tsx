@@ -155,9 +155,9 @@ export function EditRecordButton({ record, allowedStationIds }: { record: FuelRe
                   <label className="field-label">รหัสพนักงาน</label>
                   <input name="employee_code" defaultValue={record.employee_code ?? ''} className="field" />
                 </div>
-                <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3">
-                  <div className="text-xs font-bold text-teal-700">ยอดคงเหลือเดิมที่ระบบคำนวณ</div>
-                  <div className="mt-1 text-xl font-extrabold text-teal-900 tabular-nums">
+                <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3">
+                  <div className="text-xs font-bold text-brand-700">ยอดคงเหลือเดิมที่ระบบคำนวณ</div>
+                  <div className="mt-1 text-xl font-extrabold text-brand-900 tabular-nums">
                     {Math.round(initialClosing).toLocaleString('th-TH')} ลิตร
                   </div>
                 </div>

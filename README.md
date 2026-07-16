@@ -75,6 +75,13 @@ vercel --prod
 
 หรือเชื่อม repo ผ่าน Vercel dashboard แล้วตั้งค่า env vars 2 ตัวข้างต้นในหน้า Project Settings > Environment Variables
 
+### Release version
+
+- Semantic version is stored in `package.json` and appears on the login screen and application header.
+- Vercel appends `VERCEL_GIT_COMMIT_SHA`, such as `v1.0.0 + 6161cb8`, so every production screen maps to an exact source commit.
+- Update the semantic version before a production release: patch for fixes, minor for backward-compatible features, and major for breaking workflow or data-contract changes.
+- Exported PDF reports include the same release label in the footer for auditability.
+
 ## 5. Gen TypeScript types จาก schema จริง (แนะนำหลัง migrate schema)
 
 ```bash

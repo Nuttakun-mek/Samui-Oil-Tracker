@@ -47,28 +47,28 @@ export function OperationsInsights({ stations, records }: { stations: Station[];
       value: `${completeness.toFixed(1)}%`,
       detail: `${records.length.toLocaleString('th-TH')} จาก ${expectedDays.toLocaleString('th-TH')} วัน-พื้นที่`,
       icon: CalendarCheck,
-      tone: 'text-teal-700 bg-teal-50',
+      tone: 'text-brand-700 bg-brand-50',
     },
     {
       label: 'รับจริงเทียบแผน',
       value: planned ? `${planAchievement.toFixed(1)}%` : '-',
       detail: planned ? `แผน ${Math.round(planned).toLocaleString('th-TH')} ลิตร` : 'ยังไม่มีรายการที่ระบุแผนรับ',
       icon: Target,
-      tone: 'text-emerald-700 bg-emerald-50',
+      tone: 'text-brand-700 bg-brand-50',
     },
     {
       label: 'เดือนที่ใช้น้ำมันสูงสุด',
       value: peakMonth ? formatThaiMonth(peakMonth[0]) : '-',
       detail: peakMonth ? `${Math.round(peakMonth[1]).toLocaleString('th-TH')} ลิตร` : 'ยังไม่มีข้อมูล',
       icon: TrendingUp,
-      tone: 'text-amber-700 bg-amber-50',
+      tone: 'text-gold-700 bg-gold-50',
     },
     {
       label: 'วันที่ใช้สูงกว่าค่าเฉลี่ย 2 เท่า',
       value: unusualDays.toLocaleString('th-TH'),
       detail: 'ใช้เป็นรายการสำหรับตรวจสอบความผิดปกติ',
       icon: Gauge,
-      tone: 'text-sky-700 bg-sky-50',
+      tone: 'text-slate-700 bg-slate-100',
     },
   ];
 

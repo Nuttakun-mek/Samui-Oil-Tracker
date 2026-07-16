@@ -3,9 +3,9 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const COLORS: Record<string, string> = {
-  samui: '#0E7C86',
-  phangan: '#2563EB',
-  koh_tao: '#C97A0C',
+  samui: '#722257',
+  phangan: '#C69214',
+  koh_tao: '#475569',
 };
 
 interface Series {
@@ -44,7 +44,7 @@ export function TrendChart({ data }: { data: Series[] }) {
               type="monotone"
               dataKey={s.id}
               name={s.label}
-              stroke={COLORS[s.id] ?? '#0E7C86'}
+              stroke={COLORS[s.id] ?? '#722257'}
               strokeWidth={2}
               dot={false}
               connectNulls={false}

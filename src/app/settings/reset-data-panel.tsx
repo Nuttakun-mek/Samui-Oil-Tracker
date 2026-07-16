@@ -60,7 +60,7 @@ export function ResetDataPanel({ initialCounts }: ResetDataPanelProps) {
           </p>
         </div>
         <div className="inline-flex items-center gap-2 text-sm font-extrabold text-slate-700">
-          <Database size={17} className="text-teal-700" aria-hidden="true" />
+          <Database size={17} className="text-brand-700" aria-hidden="true" />
           ปัจจุบัน {total.toLocaleString('th-TH')} รายการ
         </div>
       </div>

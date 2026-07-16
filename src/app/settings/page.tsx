@@ -55,7 +55,7 @@ export default async function SettingsPage() {
   const isAdmin = profile?.role === 'admin';
 
   return (
-    <div className="max-w-6xl space-y-7">
+    <div className="w-full space-y-7">
       <div>
         <div className="page-kicker">Administration</div>
         <h1 className="page-title">ตั้งค่าระบบ</h1>
@@ -67,7 +67,7 @@ export default async function SettingsPage() {
 
       {isAdmin && (
         <nav
-          className="sticky top-16 z-30 -mx-4 flex gap-1 overflow-x-auto border-y border-slate-200 bg-slate-50/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 md:top-[109px]"
+          className="sticky top-[68px] z-30 -mx-4 flex gap-1 overflow-x-auto border-y border-slate-200 bg-[#F7F7F9]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 md:top-[113px]"
           aria-label="หมวดการตั้งค่า"
         >
           <a href="#station-settings" className="chip whitespace-nowrap">สถานี</a>
@@ -214,7 +214,7 @@ export default async function SettingsPage() {
                             name="station_ids"
                             value={station.id}
                             defaultChecked={role === 'admin' || access.has(station.id)}
-                            className="mt-0.5 h-4 w-4 shrink-0 accent-teal-600"
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
                           />
                           <span className="leading-5">{STATION_LABEL[station.id as StationId] ?? station.name}</span>
                         </label>
@@ -292,7 +292,7 @@ export default async function SettingsPage() {
                                 name="station_ids"
                                 value={station.id}
                                 defaultChecked={role === 'admin' || access.has(station.id)}
-                                className="h-4 w-4 accent-teal-600"
+                                className="h-4 w-4 accent-brand-600"
                               />
                               <span>{STATION_LABEL[station.id as StationId] ?? station.name}</span>
                             </label>

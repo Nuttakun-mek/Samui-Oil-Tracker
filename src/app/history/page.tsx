@@ -185,7 +185,7 @@ export default async function HistoryPage({
           <article key={r.id} className={`panel space-y-3 ${hasError ? 'border-red-200 bg-red-50' : issues.length ? 'border-amber-200 bg-amber-50' : ''}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-bold text-teal-700">{r.record_date}</div>
+                <div className="text-xs font-bold text-brand-700">{r.record_date}</div>
                 <h2 className="mt-0.5 text-sm font-extrabold leading-5 text-slate-950">{STATION_LABEL[r.station_id]}</h2>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <span className={`rounded-full border px-2 py-0.5 text-[11px] font-extrabold ${sourceClass(r)}`}>
@@ -229,9 +229,9 @@ export default async function HistoryPage({
                 <div className="text-xs font-bold text-amber-700">ใช้/จ่าย</div>
                 <div className="font-extrabold tabular-nums text-amber-900">{Math.round(r.dispatched_liters).toLocaleString('th-TH')}</div>
               </div>
-              <div className="rounded-md bg-teal-50 p-2">
-                <div className="text-xs font-bold text-teal-700">คงเหลือ</div>
-                <div className="font-extrabold tabular-nums text-teal-900">{Math.round(r.closing_liters).toLocaleString('th-TH')}</div>
+              <div className="rounded-md bg-brand-50 p-2">
+                <div className="text-xs font-bold text-brand-700">คงเหลือ</div>
+                <div className="font-extrabold tabular-nums text-brand-900">{Math.round(r.closing_liters).toLocaleString('th-TH')}</div>
               </div>
             </div>
 
@@ -242,7 +242,7 @@ export default async function HistoryPage({
       </div>
 
       <div className="table-shell hidden md:block">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[1320px] text-sm">
           <thead>
             <tr className="table-header">
               <th className="text-left px-3.5 py-2.5">วันที่</th>

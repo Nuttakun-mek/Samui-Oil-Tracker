@@ -67,7 +67,7 @@ export function AddMemberForm() {
                   value={stationId}
                   defaultChecked={role === 'admin'}
                   disabled={role === 'admin'}
-                  className="h-4 w-4 accent-teal-600 disabled:opacity-60"
+                  className="h-4 w-4 accent-brand-600 disabled:opacity-60"
                 />
                 <span>{STATION_LABEL[stationId]}</span>
               </label>

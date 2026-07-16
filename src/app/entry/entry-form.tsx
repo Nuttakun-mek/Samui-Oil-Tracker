@@ -111,7 +111,7 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
                 <div className="field bg-slate-50 text-slate-700" aria-label="พื้นที่ตามสิทธิ์ของบัญชี">
                   {STATION_LABEL[stations[0].id]}
                 </div>
-                <p className="mt-1 text-xs font-semibold text-teal-700">ล็อกตามสิทธิ์ของบัญชีผู้ใช้</p>
+                <p className="mt-1 text-xs font-semibold text-brand-700">ล็อกตามสิทธิ์ของบัญชีผู้ใช้</p>
               </>
             ) : (
               <select {...register('station_id')} className="field">
@@ -192,9 +192,9 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
               {Math.round(station === 'koh_tao' ? namsaeng + kfp : dispatched).toLocaleString('th-TH')} ลิตร
             </div>
           </div>
-          <div className={`rounded-lg border px-4 py-3 text-sm ${invalidClosing ? 'border-red-200 bg-red-50' : 'border-teal-200 bg-teal-50'}`}>
+          <div className={`rounded-lg border px-4 py-3 text-sm ${invalidClosing ? 'border-red-200 bg-red-50' : 'border-brand-200 bg-brand-50'}`}>
             <div className="font-bold text-slate-800">ยอดคงเหลือคำนวณอัตโนมัติ</div>
-            <div className={`mt-1 text-2xl font-extrabold tabular-nums ${invalidClosing ? 'text-red-800' : 'text-teal-800'}`}>
+            <div className={`mt-1 text-2xl font-extrabold tabular-nums ${invalidClosing ? 'text-red-800' : 'text-brand-800'}`}>
               {Math.round(closing).toLocaleString('th-TH')} ลิตร
             </div>
             <div className="mt-1 text-xs text-slate-600">
@@ -227,7 +227,7 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
         </div>
 
         <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">
-          <input type="checkbox" {...register('confirmed')} className="mt-0.5 h-4 w-4 accent-teal-700" />
+          <input type="checkbox" {...register('confirmed')} className="mt-0.5 h-4 w-4 accent-brand-700" />
           <span>ตรวจสอบพื้นที่ วันที่ ยอดรับ ยอดจ่าย และยอดคงเหลือแล้ว</span>
         </label>
         {errors.confirmed && <p className="text-xs font-semibold text-red-600">{errors.confirmed.message}</p>}

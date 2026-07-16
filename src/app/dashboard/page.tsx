@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { type FuelRecord, type Station } from '@/lib/types/domain';
+import { STATION_IDS, type FuelRecord, type Station } from '@/lib/types/domain';
 import { TankGauge } from '@/components/tank-gauge';
 import { KpiCard } from '@/components/kpi-card';
 import { InsightList } from '@/components/insight-list';
@@ -22,7 +22,9 @@ export default async function DashboardPage() {
     supabase.from('fuel_records').select('*').order('record_date', { ascending: true }),
   ]);
 
-  const stationList = (stations ?? []) as Station[];
+  const stationOrder = new Map(STATION_IDS.map((id, index) => [id, index]));
+  const stationList = ((stations ?? []) as Station[])
+    .sort((a, b) => (stationOrder.get(a.id) ?? 99) - (stationOrder.get(b.id) ?? 99));
   const recordList = (records ?? []) as FuelRecord[];
   const latestRecordDate = recordList.length ? recordList[recordList.length - 1].record_date : null;
   const recentStartDate = latestRecordDate
@@ -86,7 +88,7 @@ export default async function DashboardPage() {
 
       {recordList.length === 0 ? (
         <section className="panel flex min-h-72 flex-col items-center justify-center px-5 py-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
             <DatabaseZap size={25} aria-hidden="true" />
           </div>
           <h2 className="mt-4 text-lg font-extrabold text-slate-950">ฐานข้อมูลพร้อมสำหรับข้อมูลชุดใหม่</h2>

@@ -65,7 +65,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <h1 className="page-title">รายงานน้ำมันรายวันทุกพื้นที่</h1>
           <p className="page-subtitle">{formatThaiDate(from)} ถึง {formatThaiDate(to)}</p>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
           <FileText size={23} aria-hidden="true" />
         </div>
       </div>
@@ -85,14 +85,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div className="text-xs font-bold text-slate-500">จ่ายออกรวม</div>
           <div className="text-xl font-extrabold text-slate-950">{number(dispatched)} ลิตร</div>
         </div>
-        <div className="border-l-4 border-violet-600 pl-3">
+        <div className="section-heading">
           <div className="text-xs font-bold text-slate-500">งบประมาณโดยประมาณ</div>
           <div className="text-xl font-extrabold text-slate-950">{budget.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</div>
         </div>
       </section>
 
       <div className="table-shell">
-        <table className="w-full min-w-[1260px] text-sm">
+        <table className="w-full min-w-[1380px] text-sm">
           <thead>
             <tr className="table-header">
               <th className="px-3 py-2 text-left">วันที่</th>

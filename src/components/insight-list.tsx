@@ -41,7 +41,7 @@ export function InsightList({ stations, records }: { stations: Station[]; record
   }
 
   const toneClass = {
-    ok: 'border-teal-200 bg-teal-50 text-slate-900',
+    ok: 'border-brand-200 bg-brand-50 text-slate-900',
     warn: 'border-amber-200 bg-amber-50 text-amber-950',
     danger: 'border-red-200 bg-red-50 text-red-950',
   };

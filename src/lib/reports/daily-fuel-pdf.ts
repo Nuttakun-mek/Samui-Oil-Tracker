@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import { formatThaiDate, formatThaiDateShort } from '@/lib/format/thai-date';
 import { STATION_LABEL, type FuelRecord, type Station } from '@/lib/types/domain';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
+import { APP_RELEASE } from '@/lib/app-version';
 
 const PAGE_WIDTH = 841.89;
 const PAGE_HEIGHT = 595.28;
@@ -109,7 +110,7 @@ export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], f
     const range = doc.bufferedPageRange();
     for (let page = range.start; page < range.start + range.count; page += 1) {
       doc.switchToPage(page);
-      doc.font('Thai').fillColor('#64748b').fontSize(7).text(`PEA Oil Tracker | หน้า ${page + 1} / ${range.count}`, MARGIN, PAGE_HEIGHT - MARGIN - 10, { width: TABLE_WIDTH, align: 'right' });
+      doc.font('Thai').fillColor('#64748b').fontSize(7).text(`Island Oil Tracker ${APP_RELEASE.label} | หน้า ${page + 1} / ${range.count}`, MARGIN, PAGE_HEIGHT - MARGIN - 10, { width: TABLE_WIDTH, align: 'right' });
     }
     doc.end();
   });
