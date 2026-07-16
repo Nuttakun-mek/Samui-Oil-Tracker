@@ -9,6 +9,7 @@ import {
   type FuelRecordFormValues,
   type StationId,
 } from '@/lib/types/domain';
+import { DatePicker } from '@/components/ui/date-picker';
 import { updateFuelRecord } from '../entry/actions';
 
 function toNumber(value: FormDataEntryValue | null) {
@@ -19,6 +20,7 @@ function toNumber(value: FormDataEntryValue | null) {
 export function EditRecordButton({ record, allowedStationIds }: { record: FuelRecord; allowedStationIds: StationId[] }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [recordDate, setRecordDate] = useState(record.record_date);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -104,7 +106,8 @@ export function EditRecordButton({ record, allowedStationIds }: { record: FuelRe
                 </div>
                 <div>
                   <label className="field-label">วันที่</label>
-                  <input name="record_date" type="date" defaultValue={record.record_date} className="field" />
+                  <input type="hidden" name="record_date" value={recordDate} />
+                  <DatePicker value={recordDate} onChange={setRecordDate} />
                 </div>
               </div>
 

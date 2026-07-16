@@ -17,6 +17,8 @@ import { STATION_LABEL, type FuelRecord, type Station, type StationId } from '@/
 import { formatThaiDate, formatThaiDateShort, formatThaiMonth } from '@/lib/format/thai-date';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
 import { buildTrendBuckets, computeStationInsight } from '@/lib/analytics/station-insight';
+import { DatePicker } from '@/components/ui/date-picker';
+import { MonthPicker } from '@/components/ui/month-picker';
 
 type PeriodMode = 'daily' | 'monthly';
 type RangeMode = 'all' | '30' | '90' | '180';
@@ -215,15 +217,15 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
             <div className="grid gap-2 sm:grid-cols-3">
               <div>
                 <label className="sr-only" htmlFor="dashboard-month">เลือกเดือน</label>
-                <input id="dashboard-month" aria-label="เลือกเดือน" type="month" value={monthFilter} onChange={(event) => selectMonth(event.target.value)} className="field h-10" />
+                <MonthPicker id="dashboard-month" ariaLabel="เลือกเดือน" value={monthFilter} onChange={selectMonth} />
               </div>
               <div>
                 <label className="sr-only" htmlFor="dashboard-from">ตั้งแต่วันที่</label>
-                <input id="dashboard-from" aria-label="ตั้งแต่วันที่" type="date" value={fromDate} max={toDate || undefined} onChange={(event) => selectDate('from', event.target.value)} className="field h-10" />
+                <DatePicker id="dashboard-from" ariaLabel="ตั้งแต่วันที่" value={fromDate} max={toDate || undefined} onChange={(value) => selectDate('from', value)} />
               </div>
               <div>
                 <label className="sr-only" htmlFor="dashboard-to">ถึงวันที่</label>
-                <input id="dashboard-to" aria-label="ถึงวันที่" type="date" value={toDate} min={fromDate || undefined} onChange={(event) => selectDate('to', event.target.value)} className="field h-10" />
+                <DatePicker id="dashboard-to" ariaLabel="ถึงวันที่" value={toDate} min={fromDate || undefined} onChange={(value) => selectDate('to', value)} />
               </div>
             </div>
           </div>

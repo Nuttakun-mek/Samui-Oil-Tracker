@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { STATION_LABEL, computeClosing, fuelRecordFormSchema, type FuelRecordFormValues, type Station } from '@/lib/types/domain';
+import { DatePicker } from '@/components/ui/date-picker';
 import { upsertFuelRecord, getPreviousClosing } from './actions';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -20,6 +21,7 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
     watch,
     setValue,
     reset,
+    control,
     formState: { errors },
   } = useForm<FuelRecordFormValues>({
     resolver: zodResolver(fuelRecordFormSchema),
@@ -125,7 +127,11 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
           </div>
           <div>
             <label className="field-label">วันที่</label>
-            <input type="date" {...register('record_date')} className="field" />
+            <Controller
+              control={control}
+              name="record_date"
+              render={({ field }) => <DatePicker value={field.value} onChange={field.onChange} />}
+            />
           </div>
         </div>
 

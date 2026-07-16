@@ -3,6 +3,8 @@
 import { Download, Search } from 'lucide-react';
 import { useState } from 'react';
 import { STATION_LABEL, type Station } from '@/lib/types/domain';
+import { DatePicker } from '@/components/ui/date-picker';
+import { MonthPicker } from '@/components/ui/month-picker';
 
 function wholeMonthForRange(from: string, to: string) {
   if (from.slice(0, 7) !== to.slice(0, 7) || !from.endsWith('-01')) return '';
@@ -47,7 +49,7 @@ export function ReportFilter({
     <div className="grid gap-3 border-y border-slate-200 py-4 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_1fr_1fr_auto_auto] xl:items-end">
       <div>
         <label className="field-label" htmlFor="report-month">เลือกเดือน</label>
-        <input id="report-month" type="month" value={month} onChange={(event) => selectMonth(event.target.value)} className="field" />
+        <MonthPicker id="report-month" value={month} onChange={selectMonth} />
       </div>
       <div>
         <label className="field-label" htmlFor="report-station">พื้นที่</label>
@@ -58,11 +60,11 @@ export function ReportFilter({
       </div>
       <div>
         <label className="field-label" htmlFor="report-from">ตั้งแต่วันที่</label>
-        <input id="report-from" type="date" value={from} max={to || undefined} onChange={(event) => selectDate('from', event.target.value)} className="field" />
+        <DatePicker id="report-from" value={from} max={to || undefined} onChange={(value) => selectDate('from', value)} />
       </div>
       <div>
         <label className="field-label" htmlFor="report-to">ถึงวันที่</label>
-        <input id="report-to" type="date" value={to} min={from || undefined} onChange={(event) => selectDate('to', event.target.value)} className="field" />
+        <DatePicker id="report-to" value={to} min={from || undefined} onChange={(value) => selectDate('to', value)} />
       </div>
       <a href={validRange ? `/reports?${query}` : '#'} aria-disabled={!validRange} className={`btn-secondary justify-center ${!validRange ? 'pointer-events-none opacity-50' : ''}`}>
         <Search size={17} aria-hidden="true" />
