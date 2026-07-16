@@ -11,7 +11,9 @@ export function KpiCard({
   decimals?: number;
   tone?: 'default' | 'danger';
 }) {
-  const display = Number.isFinite(value) ? value.toFixed(decimals) : '-';
+  const display = Number.isFinite(value)
+    ? value.toLocaleString('th-TH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    : '-';
   return (
     <div className={`panel border-l-4 ${tone === 'danger' ? 'border-l-red-600' : 'border-l-teal-700'}`}>
       <div className="mb-1.5 text-xs font-bold text-slate-500">{label}</div>

@@ -1,16 +1,17 @@
 export type UserRole = 'admin' | 'field';
-export type AppPageId = 'dashboard' | 'entry' | 'history' | 'settings';
+export type AppPageId = 'dashboard' | 'entry' | 'history' | 'reports' | 'settings';
 
 export const APP_NAV_ITEMS: Array<{ id: AppPageId; href: `/${AppPageId}`; label: string }> = [
   { id: 'dashboard', href: '/dashboard', label: 'แดชบอร์ด' },
   { id: 'entry', href: '/entry', label: 'บันทึกการใช้น้ำมัน' },
   { id: 'history', href: '/history', label: 'ประวัติข้อมูล' },
+  { id: 'reports', href: '/reports', label: 'รายงาน' },
   { id: 'settings', href: '/settings', label: 'ตั้งค่า' },
 ];
 
 const ROLE_PAGE_ACCESS: Record<UserRole, AppPageId[]> = {
-  admin: ['dashboard', 'entry', 'history', 'settings'],
-  field: ['dashboard', 'entry', 'history'],
+  admin: ['dashboard', 'entry', 'history', 'reports', 'settings'],
+  field: ['dashboard', 'entry', 'history', 'reports'],
 };
 
 export function normalizeRole(role: string | null | undefined): UserRole {

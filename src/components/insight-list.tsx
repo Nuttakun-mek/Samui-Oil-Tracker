@@ -15,7 +15,7 @@ export function InsightList({ stations, records }: { stations: Station[]; record
     if (daysLeft < st.low_stock_days) {
       items.push({
         level: 'danger',
-        text: `${st.name} น้ำมันคงเหลือจะใช้ได้อีกประมาณ ${daysLeft.toFixed(1)} วัน ที่อัตราใช้เฉลี่ย ${Math.round(avg7).toLocaleString('th-TH')} ลิตร/วัน — ควรเร่งจัดส่งเพิ่ม`,
+        text: `${st.name} น้ำมันคงเหลือจะใช้ได้อีกประมาณ ${daysLeft.toFixed(1)} วัน ที่อัตราใช้เฉลี่ย ${Math.round(avg7).toLocaleString('th-TH')} ลิตร/วัน จาก 7 วันที่มีบันทึกล่าสุด — ควรเร่งจัดส่งเพิ่ม`,
       });
     } else if (pct < 35) {
       items.push({ level: 'warn', text: `${st.name} ระดับน้ำมันอยู่ที่ ${pct.toFixed(0)}% ของความจุถัง ควรวางแผนรับน้ำมันรอบถัดไป` });

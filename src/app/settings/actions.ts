@@ -64,13 +64,28 @@ export async function updateStationSettings(formData: FormData) {
   const id = formData.get('id') as string;
   const tank_capacity_liters = Number(formData.get('tank_capacity_liters'));
   const low_stock_days = Number(formData.get('low_stock_days'));
+  const fuel_price_per_liter = Number(formData.get('fuel_price_per_liter'));
+
+  if (
+    !Number.isFinite(tank_capacity_liters) || tank_capacity_liters < 0 ||
+    !Number.isFinite(low_stock_days) || low_stock_days < 0 ||
+    !Number.isFinite(fuel_price_per_liter) || fuel_price_per_liter < 0
+  ) {
+    throw new Error('ค่าตั้งค่าสถานีต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
+  }
 
   const supabase = await createClient();
   // RLS (stations_write) จะปฏิเสธถ้าไม่ใช่ admin — ไม่ต้องเช็ค role ซ้ำในโค้ดฝั่งนี้
-  await supabase.from('stations').update({ tank_capacity_liters, low_stock_days }).eq('id', id);
+  const { error } = await supabase
+    .from('stations')
+    .update({ tank_capacity_liters, low_stock_days, fuel_price_per_liter })
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
+  revalidatePath('/reports');
 }
 
 export async function resetOperationalData() {

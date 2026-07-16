@@ -3,14 +3,16 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { STATION_IDS, STATION_LABEL, computeClosing, fuelRecordFormSchema, type FuelRecordFormValues } from '@/lib/types/domain';
+import { STATION_LABEL, computeClosing, fuelRecordFormSchema, type FuelRecordFormValues, type Station } from '@/lib/types/domain';
 import { upsertFuelRecord, getPreviousClosing } from './actions';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export default function EntryPage() {
+export default function EntryForm({ stations }: { stations: Station[] }) {
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<string | null>(null);
+  const [previousDate, setPreviousDate] = useState<string | null>(null);
+  const defaultStationId = stations[0]?.id ?? 'samui';
 
   const {
     register,
@@ -22,13 +24,17 @@ export default function EntryPage() {
   } = useForm<FuelRecordFormValues>({
     resolver: zodResolver(fuelRecordFormSchema),
     defaultValues: {
-      station_id: 'samui',
+      station_id: defaultStationId,
       record_date: today(),
       opening_liters: 0,
       received_liters: 0,
       plan_received_liters: 0,
       dispatched_liters: 0,
       employee_code: '',
+      vehicle_plate: '',
+      reference_document_no: '',
+      contract_code: '',
+      confirmed: false,
     },
   });
 
@@ -44,7 +50,10 @@ export default function EntryPage() {
   // autofill "ยอดยกมา" จากยอดคงเหลือวันก่อนหน้า
   useEffect(() => {
     if (!station || !recordDate) return;
-    getPreviousClosing(station, recordDate).then((val) => setValue('opening_liters', val));
+    getPreviousClosing(station, recordDate).then((previous) => {
+      setValue('opening_liters', previous.closing);
+      setPreviousDate(previous.recordDate);
+    });
   }, [station, recordDate, setValue]);
 
   const closing = computeClosing({
@@ -55,13 +64,28 @@ export default function EntryPage() {
     dispatched_namsaeng: namsaeng,
     dispatched_kfp: kfp,
   });
+  const selectedStation = stations.find((item) => item.id === station);
+  const capacity = selectedStation?.tank_capacity_liters ?? 0;
+  const exceedsCapacity = capacity > 0 && closing > capacity;
+  const invalidClosing = closing < 0 || exceedsCapacity;
 
   const onSubmit = (values: FuelRecordFormValues) => {
     startTransition(async () => {
       const res = await upsertFuelRecord(values);
       if (res.ok) {
         setToast(`บันทึกข้อมูล ${STATION_LABEL[values.station_id]} วันที่ ${values.record_date} เรียบร้อย`);
-        reset({ ...values, received_liters: 0, dispatched_liters: 0, dispatched_namsaeng: 0, dispatched_kfp: 0, note: '' });
+        reset({
+          ...values,
+          received_liters: 0,
+          dispatched_liters: 0,
+          dispatched_namsaeng: 0,
+          dispatched_kfp: 0,
+          vehicle_plate: '',
+          reference_document_no: '',
+          contract_code: '',
+          note: '',
+          confirmed: false,
+        });
       } else {
         setToast(`เกิดข้อผิดพลาด: ${res.error}`);
       }
@@ -81,13 +105,23 @@ export default function EntryPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="field-label">พื้นที่ / สถานี</label>
-            <select {...register('station_id')} className="field">
-              {STATION_IDS.map((id) => (
-                <option key={id} value={id}>
-                  {STATION_LABEL[id]}
-                </option>
-              ))}
-            </select>
+            {stations.length === 1 ? (
+              <>
+                <input type="hidden" {...register('station_id')} />
+                <div className="field bg-slate-50 text-slate-700" aria-label="พื้นที่ตามสิทธิ์ของบัญชี">
+                  {STATION_LABEL[stations[0].id]}
+                </div>
+                <p className="mt-1 text-xs font-semibold text-teal-700">ล็อกตามสิทธิ์ของบัญชีผู้ใช้</p>
+              </>
+            ) : (
+              <select {...register('station_id')} className="field">
+                {stations.map(({ id }) => (
+                  <option key={id} value={id}>
+                    {STATION_LABEL[id]}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div>
             <label className="field-label">วันที่</label>
@@ -114,6 +148,9 @@ export default function EntryPage() {
               <span className="text-xs font-normal text-slate-500">อัตโนมัติ</span>
             </label>
             <input type="number" step="0.1" {...register('opening_liters')} className="field" />
+            <p className="mt-1 text-xs text-slate-500">
+              {previousDate ? `จากยอดปิดวันที่ ${previousDate}` : 'ไม่พบยอดปิดก่อนหน้า'}
+            </p>
           </div>
           <div>
             <label className="field-label">รับน้ำมันจริง (ลิตร)</label>
@@ -122,12 +159,10 @@ export default function EntryPage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          {!isTao && (
-            <div>
-              <label className="field-label">แผนรับน้ำมัน (ลิตร)</label>
-              <input type="number" step="0.1" {...register('plan_received_liters')} className="field" />
-            </div>
-          )}
+          <div>
+            <label className="field-label">แผนรับน้ำมัน (ลิตร)</label>
+            <input type="number" step="0.1" {...register('plan_received_liters')} className="field" />
+          </div>
           {!isTao && (
             <div>
               <label className="field-label">ยอดจ่ายน้ำมันรวม (ลิตร)</label>
@@ -157,22 +192,47 @@ export default function EntryPage() {
               {Math.round(station === 'koh_tao' ? namsaeng + kfp : dispatched).toLocaleString('th-TH')} ลิตร
             </div>
           </div>
-          <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm">
+          <div className={`rounded-lg border px-4 py-3 text-sm ${invalidClosing ? 'border-red-200 bg-red-50' : 'border-teal-200 bg-teal-50'}`}>
             <div className="font-bold text-slate-800">ยอดคงเหลือคำนวณอัตโนมัติ</div>
-            <div className="mt-1 text-2xl font-extrabold text-teal-800 tabular-nums">
+            <div className={`mt-1 text-2xl font-extrabold tabular-nums ${invalidClosing ? 'text-red-800' : 'text-teal-800'}`}>
               {Math.round(closing).toLocaleString('th-TH')} ลิตร
             </div>
+            <div className="mt-1 text-xs text-slate-600">
+              ความจุถัง {Math.round(capacity).toLocaleString('th-TH')} ลิตร
+              {closing < 0 ? ' - ยอดติดลบ' : exceedsCapacity ? ' - เกินความจุถัง' : ''}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="field-label">ทะเบียนรถส่งน้ำมัน</label>
+            <input type="text" {...register('vehicle_plate')} className="field" placeholder="ถ้ามี" />
+          </div>
+          <div>
+            <label className="field-label">เลขใบส่งของ / PO</label>
+            <input type="text" {...register('reference_document_no')} className="field" placeholder="ถ้ามี" />
+          </div>
+          <div>
+            <label className="field-label">รหัสสัญญา</label>
+            <input type="text" {...register('contract_code')} className="field" placeholder="เช่น ช.034/2569" />
           </div>
         </div>
 
         <div>
           <label className="field-label">
-            หมายเหตุ <span className="text-xs font-normal text-slate-500">เช่น ทะเบียนรถ, เลขที่ PO</span>
+            หมายเหตุ <span className="text-xs font-normal text-slate-500">เช่น เหตุการณ์ผิดปกติ หรือรายละเอียดประกอบ</span>
           </label>
           <input type="text" {...register('note')} className="field" />
         </div>
 
-        <button type="submit" disabled={isPending} className="btn-primary w-full sm:w-auto">
+        <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">
+          <input type="checkbox" {...register('confirmed')} className="mt-0.5 h-4 w-4 accent-teal-700" />
+          <span>ตรวจสอบพื้นที่ วันที่ ยอดรับ ยอดจ่าย และยอดคงเหลือแล้ว</span>
+        </label>
+        {errors.confirmed && <p className="text-xs font-semibold text-red-600">{errors.confirmed.message}</p>}
+
+        <button type="submit" disabled={isPending || invalidClosing || stations.length === 0} className="btn-primary w-full sm:w-auto">
           {isPending ? 'กำลังบันทึก...' : 'บันทึกการใช้น้ำมัน'}
         </button>
       </form>

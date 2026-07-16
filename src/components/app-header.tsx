@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ClipboardPenLine, History, Menu, Settings, X } from 'lucide-react';
+import { BarChart3, ClipboardPenLine, FileText, History, Menu, Settings, X } from 'lucide-react';
 import { useState } from 'react';
 import type { AppPageId } from '@/lib/auth/page-access';
 import { LogoutButton } from '@/components/logout-button';
@@ -22,6 +22,7 @@ const NAV_ICONS = {
   dashboard: BarChart3,
   entry: ClipboardPenLine,
   history: History,
+  reports: FileText,
   settings: Settings,
 } as const;
 

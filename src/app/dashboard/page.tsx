@@ -4,7 +4,9 @@ import { TankGauge } from '@/components/tank-gauge';
 import { KpiCard } from '@/components/kpi-card';
 import { InsightList } from '@/components/insight-list';
 import { DashboardAnalytics } from '@/components/dashboard-analytics';
+import { OperationsInsights } from '@/components/operations-insights';
 import { requirePageAccess } from '@/lib/auth/server';
+import { estimatedFuelCost, stationCoverage } from '@/lib/analytics/fuel';
 import Link from 'next/link';
 import { DatabaseZap, FileUp } from 'lucide-react';
 
@@ -40,11 +42,6 @@ export default async function DashboardPage() {
       .toISOString()
       .slice(0, 10);
     return stationRecords.filter((record) => record.record_date >= startDate && record.record_date <= latestDate);
-  };
-  const avgDispatch = (id: string, days: number) => {
-    const list = recentByStation(id, days);
-    if (!list.length) return 0;
-    return list.reduce((a, r) => a + r.dispatched_liters, 0) / list.length;
   };
   const sourceLabel = (source: FuelRecord['record_source']) => {
     if (source === 'database') return 'ฐานข้อมูลย้อนหลัง';
@@ -108,14 +105,32 @@ export default async function DashboardPage() {
         </section>
       ) : (
         <>
+      <section>
+        <div className="mb-3">
+          <h2 className="text-lg font-extrabold text-slate-950">สถานะน้ำมันรายพื้นที่</h2>
+          <p className="text-sm text-slate-600">ยอดคงเหลือล่าสุด อัตราใช้ปกติ และจำนวนวันที่คาดว่าจะใช้งานได้ของแต่ละพื้นที่</p>
+        </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {stationList.map((st) => {
           const rec = latest(st.id);
           const cur = rec?.closing_liters ?? 0;
           const pct = st.tank_capacity_liters > 0 ? (cur / st.tank_capacity_liters) * 100 : 0;
-          return <TankGauge key={st.id} label={st.name} liters={cur} capacity={st.tank_capacity_liters} pct={pct} />;
+          const coverage = stationCoverage(st, recordList);
+          return (
+            <TankGauge
+              key={st.id}
+              label={st.name}
+              liters={cur}
+              capacity={st.tank_capacity_liters}
+              pct={pct}
+              averageDailyUsage={coverage.averageDailyUsage}
+              daysRemaining={coverage.daysRemaining}
+              lowStockDays={st.low_stock_days}
+            />
+          );
         })}
       </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
@@ -134,21 +149,16 @@ export default async function DashboardPage() {
           unit="ลิตร"
         />
         <KpiCard
-          label="พื้นที่วิกฤตสุด — เหลือใช้ได้อีก"
-          value={Math.min(
-            ...stationList.map((st) => {
-              const rec = latest(st.id);
-              const avg = avgDispatch(st.id, 7);
-              return rec && avg > 0 ? rec.closing_liters / avg : Infinity;
-            })
-          )}
-          unit="วัน"
-          decimals={1}
-          tone="danger"
+          label="งบประมาณใช้จ่ายโดยประมาณ 30 วัน"
+          value={estimatedFuelCost(stationList, stationList.flatMap((st) => recentByStation(st.id, 30)))}
+          unit="บาท"
+          decimals={2}
         />
       </div>
 
       <DashboardAnalytics stations={stationList} records={recordList} />
+
+      <OperationsInsights stations={stationList} records={recordList} />
 
       <div className="panel">
         <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

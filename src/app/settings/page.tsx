@@ -82,7 +82,7 @@ export default async function SettingsPage() {
       <section id="station-settings" className="scroll-mt-32 space-y-3">
         <div>
           <h2 className="text-lg font-extrabold text-slate-950">ตั้งค่าสถานี</h2>
-          <p className="text-sm text-slate-600">กำหนดความจุถังสำรองและจำนวนวันที่ถือว่าอยู่ในเกณฑ์เฝ้าระวัง</p>
+          <p className="text-sm text-slate-600">กำหนดความจุถัง เกณฑ์เฝ้าระวัง และราคาต่อลิตรสำหรับประมาณการงบประมาณ</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {list.map((st) => (
@@ -108,6 +108,19 @@ export default async function SettingsPage() {
                   className="field"
                   disabled={!isAdmin}
                 />
+              </div>
+              <div>
+                <label className="field-label">ราคาน้ำมันต่อลิตร (บาท)</label>
+                <input
+                  name="fuel_price_per_liter"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue={st.fuel_price_per_liter}
+                  className="field"
+                  disabled={!isAdmin}
+                />
+                <p className="mt-1 text-xs text-slate-500">ใช้คูณยอดจ่ายออกเพื่อแสดงงบประมาณโดยประมาณ</p>
               </div>
               {isAdmin && (
                 <button type="submit" className="btn-primary w-full sm:w-auto">

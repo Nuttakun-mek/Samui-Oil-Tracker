@@ -3,7 +3,6 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  STATION_IDS,
   STATION_LABEL,
   computeClosing,
   type FuelRecord,
@@ -17,7 +16,7 @@ function toNumber(value: FormDataEntryValue | null) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function EditRecordButton({ record }: { record: FuelRecord }) {
+export function EditRecordButton({ record, allowedStationIds }: { record: FuelRecord; allowedStationIds: StationId[] }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -50,7 +49,11 @@ export function EditRecordButton({ record }: { record: FuelRecord }) {
       dispatched_namsaeng: toNumber(formData.get('dispatched_namsaeng')),
       dispatched_kfp: toNumber(formData.get('dispatched_kfp')),
       employee_code: String(formData.get('employee_code') ?? '').trim(),
+      vehicle_plate: String(formData.get('vehicle_plate') ?? '').trim(),
+      reference_document_no: String(formData.get('reference_document_no') ?? '').trim(),
+      contract_code: String(formData.get('contract_code') ?? '').trim(),
       note: String(formData.get('note') ?? '').trim(),
+      confirmed: true,
     };
 
     startTransition(async () => {
@@ -92,7 +95,7 @@ export function EditRecordButton({ record }: { record: FuelRecord }) {
                 <div>
                   <label className="field-label">พื้นที่</label>
                   <select name="station_id" defaultValue={initialStation} className="field">
-                    {STATION_IDS.map((stationId) => (
+                    {allowedStationIds.map((stationId) => (
                       <option key={stationId} value={stationId}>
                         {STATION_LABEL[stationId]}
                       </option>
@@ -156,6 +159,23 @@ export function EditRecordButton({ record }: { record: FuelRecord }) {
                   <div className="text-xs font-bold text-teal-700">ยอดคงเหลือเดิมที่ระบบคำนวณ</div>
                   <div className="mt-1 text-xl font-extrabold text-teal-900 tabular-nums">
                     {Math.round(initialClosing).toLocaleString('th-TH')} ลิตร
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="field-label">ทะเบียนรถ</label>
+                    <input name="vehicle_plate" defaultValue={record.vehicle_plate ?? ''} className="field" />
+                  </div>
+                  <div>
+                    <label className="field-label">เลขใบส่งของ / PO</label>
+                    <input name="reference_document_no" defaultValue={record.reference_document_no ?? ''} className="field" />
+                  </div>
+                  <div>
+                    <label className="field-label">รหัสสัญญา</label>
+                    <input name="contract_code" defaultValue={record.contract_code ?? ''} className="field" />
                   </div>
                 </div>
               </div>

@@ -14,6 +14,7 @@ export interface Station {
   name: string;
   tank_capacity_liters: number;
   low_stock_days: number;
+  fuel_price_per_liter: number;
   has_dispatch_breakdown: boolean;
 }
 
@@ -29,6 +30,9 @@ export interface FuelRecord {
   dispatched_kfp: number | null;
   closing_liters: number;
   employee_code: string | null;
+  vehicle_plate: string | null;
+  reference_document_no: string | null;
+  contract_code: string | null;
   record_source: 'manual' | 'upload' | 'database';
   source_file_name: string | null;
   source_sheet_name: string | null;
@@ -52,8 +56,16 @@ export const fuelRecordFormSchema = z
     dispatched_namsaeng: z.coerce.number().min(0).optional(),
     dispatched_kfp: z.coerce.number().min(0).optional(),
     employee_code: z.string().trim().min(1, 'กรุณากรอกรหัสพนักงาน').max(50, 'รหัสพนักงานยาวเกินไป'),
+    vehicle_plate: z.string().trim().max(30, 'ทะเบียนรถยาวเกินไป').optional(),
+    reference_document_no: z.string().trim().max(100, 'เลขอ้างอิงยาวเกินไป').optional(),
+    contract_code: z.string().trim().max(100, 'รหัสสัญญายาวเกินไป').optional(),
     note: z.string().max(500).optional(),
+    confirmed: z.boolean().refine((value) => value, 'กรุณายืนยันว่าตรวจสอบตัวเลขแล้ว'),
   })
+  .refine(
+    (data) => computeClosing(data) >= 0,
+    { message: 'ยอดจ่ายมากกว่ายอดน้ำมันที่มีอยู่', path: ['dispatched_liters'] }
+  )
   .refine(
     (data) => {
       // เกาะเต่าต้องกรอกยอดจ่ายแยก 2 รายการ

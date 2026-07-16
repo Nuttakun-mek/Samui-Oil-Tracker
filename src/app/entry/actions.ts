@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { computeClosing, fuelRecordFormSchema, type FuelRecordFormValues } from '@/lib/types/domain';
-import { requireAdmin, requirePageAccess } from '@/lib/auth/server';
+import { getCurrentUserAccess, requireAdmin, requirePageAccess } from '@/lib/auth/server';
 
 export async function upsertFuelRecord(raw: FuelRecordFormValues) {
   await requirePageAccess('entry');
@@ -13,11 +13,13 @@ export async function upsertFuelRecord(raw: FuelRecordFormValues) {
     return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' };
   }
   const values = parsed.data;
+  const access = await getCurrentUserAccess();
+  if (!access.stationIds.includes(values.station_id)) {
+    return { ok: false as const, error: 'บัญชีนี้ไม่มีสิทธิ์บันทึกข้อมูลของพื้นที่ที่เลือก' };
+  }
 
   const supabase = await createClient();
-  const { data: userRes } = await supabase.auth.getUser();
-  const uid = userRes.user?.id;
-  if (!uid) return { ok: false as const, error: 'ไม่ได้เข้าสู่ระบบ' };
+  const uid = access.user.id;
 
   const dispatched_liters =
     values.station_id === 'koh_tao'
@@ -25,6 +27,15 @@ export async function upsertFuelRecord(raw: FuelRecordFormValues) {
       : values.dispatched_liters;
 
   const closing_liters = computeClosing(values);
+  const { data: station } = await supabase
+    .from('stations')
+    .select('tank_capacity_liters')
+    .eq('id', values.station_id)
+    .single();
+  if (closing_liters < 0) return { ok: false as const, error: 'ยอดคงเหลือติดลบ กรุณาตรวจยอดจ่าย' };
+  if (station && closing_liters > Number(station.tank_capacity_liters)) {
+    return { ok: false as const, error: 'ยอดคงเหลือเกินความจุถังของพื้นที่นี้' };
+  }
 
   const { error } = await supabase
     .from('fuel_records')
@@ -40,6 +51,9 @@ export async function upsertFuelRecord(raw: FuelRecordFormValues) {
         dispatched_kfp: values.station_id === 'koh_tao' ? values.dispatched_kfp : null,
         closing_liters,
         employee_code: values.employee_code,
+        vehicle_plate: values.vehicle_plate || null,
+        reference_document_no: values.reference_document_no || null,
+        contract_code: values.contract_code || null,
         record_source: 'manual',
         source_file_name: null,
         source_note: 'daily_entry',
@@ -79,17 +93,28 @@ export async function updateFuelRecord(id: string, raw: FuelRecordFormValues) {
     return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' };
   }
   const values = parsed.data;
+  const access = await getCurrentUserAccess();
+  if (!access.stationIds.includes(values.station_id)) {
+    return { ok: false as const, error: 'บัญชีนี้ไม่มีสิทธิ์แก้ไขข้อมูลของพื้นที่ที่เลือก' };
+  }
 
   const supabase = await createClient();
-  const { data: userRes } = await supabase.auth.getUser();
-  const uid = userRes.user?.id;
-  if (!uid) return { ok: false as const, error: 'ไม่ได้เข้าสู่ระบบ' };
+  const uid = access.user.id;
 
   const dispatched_liters =
     values.station_id === 'koh_tao'
       ? (values.dispatched_namsaeng ?? 0) + (values.dispatched_kfp ?? 0)
       : values.dispatched_liters;
   const closing_liters = computeClosing(values);
+  const { data: station } = await supabase
+    .from('stations')
+    .select('tank_capacity_liters')
+    .eq('id', values.station_id)
+    .single();
+  if (closing_liters < 0) return { ok: false as const, error: 'ยอดคงเหลือติดลบ กรุณาตรวจยอดจ่าย' };
+  if (station && closing_liters > Number(station.tank_capacity_liters)) {
+    return { ok: false as const, error: 'ยอดคงเหลือเกินความจุถังของพื้นที่นี้' };
+  }
 
   const { error } = await supabase
     .from('fuel_records')
@@ -104,6 +129,9 @@ export async function updateFuelRecord(id: string, raw: FuelRecordFormValues) {
       dispatched_kfp: values.station_id === 'koh_tao' ? values.dispatched_kfp : null,
       closing_liters,
       employee_code: values.employee_code,
+      vehicle_plate: values.vehicle_plate || null,
+      reference_document_no: values.reference_document_no || null,
+      contract_code: values.contract_code || null,
       note: values.note ?? null,
       updated_by: uid,
     })
@@ -121,16 +149,21 @@ export async function updateFuelRecord(id: string, raw: FuelRecordFormValues) {
 export async function getPreviousClosing(stationId: string, beforeDate: string) {
   await requirePageAccess('entry');
 
+  const access = await getCurrentUserAccess();
+  if (!access.stationIds.includes(stationId as FuelRecordFormValues['station_id'])) {
+    return { closing: 0, recordDate: null };
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('fuel_records')
-    .select('closing_liters')
+    .select('closing_liters, record_date')
     .eq('station_id', stationId)
     .lt('record_date', beforeDate)
     .order('record_date', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) return 0;
-  return data.closing_liters as number;
+  if (error || !data) return { closing: 0, recordDate: null };
+  return { closing: Number(data.closing_liters), recordDate: data.record_date as string };
 }

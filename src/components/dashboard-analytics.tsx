@@ -13,6 +13,8 @@ import {
   YAxis,
 } from 'recharts';
 import { STATION_LABEL, type FuelRecord, type Station, type StationId } from '@/lib/types/domain';
+import { formatThaiDateShort, formatThaiMonth } from '@/lib/format/thai-date';
+import { estimatedFuelCost } from '@/lib/analytics/fuel';
 
 type PeriodMode = 'daily' | 'monthly';
 type RangeMode = 'all' | '30' | '90' | '180';
@@ -38,6 +40,9 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
   const [periodMode, setPeriodMode] = useState<PeriodMode>('monthly');
   const [stationFilter, setStationFilter] = useState<StationFilter>('all');
   const [rangeMode, setRangeMode] = useState<RangeMode>('all');
+  const [monthFilter, setMonthFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const latestDate = records.length ? records[records.length - 1].record_date : null;
   const startDate = rangeStart(latestDate, rangeMode);
@@ -45,10 +50,13 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       if (stationFilter !== 'all' && record.station_id !== stationFilter) return false;
+      if (monthFilter && !record.record_date.startsWith(monthFilter)) return false;
+      if (fromDate && record.record_date < fromDate) return false;
+      if (toDate && record.record_date > toDate) return false;
       if (startDate && record.record_date < startDate) return false;
       return true;
     });
-  }, [records, startDate, stationFilter]);
+  }, [fromDate, monthFilter, records, startDate, stationFilter, toDate]);
 
   const chartData = useMemo(() => {
     const buckets = new Map<
@@ -87,7 +95,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
     return Array.from(buckets.values())
       .sort((a, b) => a.period.localeCompare(b.period))
       .map((bucket) => ({
-        period: bucket.period,
+        period: periodMode === 'monthly' ? formatThaiMonth(bucket.period) : formatThaiDateShort(bucket.period),
         received: bucket.received,
         dispatched: bucket.dispatched,
         closing: Object.values(bucket.closingByStation).reduce((sum, item) => sum + (item?.value ?? 0), 0),
@@ -109,6 +117,28 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
 
   const netChange = totals.received - totals.dispatched;
   const usageRatio = totals.received > 0 ? (totals.dispatched / totals.received) * 100 : 0;
+  const budget = estimatedFuelCost(stations, filteredRecords);
+
+  const selectQuickRange = (value: RangeMode) => {
+    setRangeMode(value);
+    setMonthFilter('');
+    setFromDate('');
+    setToDate('');
+  };
+
+  const selectMonth = (value: string) => {
+    setMonthFilter(value);
+    setRangeMode('all');
+    setFromDate('');
+    setToDate('');
+  };
+
+  const selectDate = (side: 'from' | 'to', value: string) => {
+    setRangeMode('all');
+    setMonthFilter('');
+    if (side === 'from') setFromDate(value);
+    else setToDate(value);
+  };
 
   return (
     <div className="panel space-y-4">
@@ -119,29 +149,50 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
             แท่งสีเขียวคือรับเข้า แท่งสีส้มคือใช้ออก และเส้นสีน้ำเงินคือยอดคงเหลือปลายช่วง
           </p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <select value={periodMode} onChange={(event) => setPeriodMode(event.target.value as PeriodMode)} className="field h-10">
-            <option value="monthly">รายเดือน</option>
-            <option value="daily">รายวัน</option>
-          </select>
-          <select value={stationFilter} onChange={(event) => setStationFilter(event.target.value as StationFilter)} className="field h-10">
-            <option value="all">ทุกพื้นที่</option>
-            {stations.map((station) => (
-              <option key={station.id} value={station.id}>
-                {STATION_LABEL[station.id]}
-              </option>
-            ))}
-          </select>
-          <select value={rangeMode} onChange={(event) => setRangeMode(event.target.value as RangeMode)} className="field h-10">
-            <option value="all">ทั้งหมด</option>
-            <option value="30">30 วันล่าสุด</option>
-            <option value="90">90 วันล่าสุด</option>
-            <option value="180">180 วันล่าสุด</option>
-          </select>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+          <div>
+            <label className="field-label" htmlFor="dashboard-period">รูปแบบกราฟ</label>
+            <select id="dashboard-period" value={periodMode} onChange={(event) => setPeriodMode(event.target.value as PeriodMode)} className="field h-10">
+              <option value="monthly">รายเดือน</option>
+              <option value="daily">รายวัน</option>
+            </select>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="dashboard-station">พื้นที่</label>
+            <select id="dashboard-station" value={stationFilter} onChange={(event) => setStationFilter(event.target.value as StationFilter)} className="field h-10">
+              <option value="all">ทุกพื้นที่</option>
+              {stations.map((station) => (
+                <option key={station.id} value={station.id}>
+                  {STATION_LABEL[station.id]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="dashboard-range">ช่วงด่วน</label>
+            <select id="dashboard-range" value={rangeMode} onChange={(event) => selectQuickRange(event.target.value as RangeMode)} className="field h-10">
+              <option value="all">ทั้งหมด</option>
+              <option value="30">30 วันล่าสุด</option>
+              <option value="90">90 วันล่าสุด</option>
+              <option value="180">180 วันล่าสุด</option>
+            </select>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="dashboard-month">เดือน</label>
+            <input id="dashboard-month" type="month" value={monthFilter} onChange={(event) => selectMonth(event.target.value)} className="field h-10" />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="dashboard-from">ตั้งแต่วันที่</label>
+            <input id="dashboard-from" type="date" value={fromDate} max={toDate || undefined} onChange={(event) => selectDate('from', event.target.value)} className="field h-10" />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="dashboard-to">ถึงวันที่</label>
+            <input id="dashboard-to" type="date" value={toDate} min={fromDate || undefined} onChange={(event) => selectDate('to', event.target.value)} className="field h-10" />
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
           <div className="text-xs font-bold text-emerald-700">รับเข้ารวม</div>
           <div className="text-xl font-extrabold text-emerald-900 tabular-nums">{formatNumber(totals.received)}</div>
@@ -159,6 +210,13 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
           <div className={`text-xl font-extrabold tabular-nums ${netChange >= 0 ? 'text-teal-900' : 'text-red-900'}`}>
             {formatNumber(netChange)}
           </div>
+        </div>
+        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
+          <div className="text-xs font-bold text-violet-700">งบประมาณโดยประมาณ</div>
+          <div className="text-xl font-extrabold tabular-nums text-violet-950">
+            {budget.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-xs font-semibold text-violet-700">บาท</div>
         </div>
       </div>
 

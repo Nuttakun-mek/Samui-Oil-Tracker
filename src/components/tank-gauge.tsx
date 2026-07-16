@@ -3,14 +3,24 @@ export function TankGauge({
   liters,
   capacity,
   pct,
+  averageDailyUsage,
+  daysRemaining,
+  lowStockDays,
 }: {
   label: string;
   liters: number;
   capacity: number;
   pct: number;
+  averageDailyUsage: number;
+  daysRemaining: number | null;
+  lowStockDays: number;
 }) {
   const clamped = Math.max(0, Math.min(100, pct));
-  const status = clamped < 15 ? 'danger' : clamped < 35 ? 'warn' : 'ok';
+  const status = daysRemaining !== null && daysRemaining < lowStockDays
+    ? 'danger'
+    : (daysRemaining !== null && daysRemaining < lowStockDays * 1.5) || clamped < 35
+      ? 'warn'
+      : 'ok';
   const fillColor = { ok: '#0E7C86', warn: '#C97A0C', danger: '#B23A1B' }[status];
   const statusText = { ok: 'ปกติ', warn: 'เฝ้าระวัง', danger: 'วิกฤต' }[status];
   const statusClass = {
@@ -45,6 +55,22 @@ export function TankGauge({
           style={{ width: `${clamped}%`, background: fillColor }}
         />
       </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
+        <div>
+          <dt className="text-xs font-semibold text-slate-500">ใช้เฉลี่ย/วัน</dt>
+          <dd className="mt-0.5 text-base font-extrabold tabular-nums text-slate-900">
+            {Math.round(averageDailyUsage).toLocaleString('th-TH')} <span className="text-xs font-semibold text-slate-500">ลิตร</span>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold text-slate-500">คาดว่าใช้ได้อีก</dt>
+          <dd className={`mt-0.5 text-base font-extrabold tabular-nums ${status === 'danger' ? 'text-red-700' : 'text-slate-900'}`}>
+            {daysRemaining === null ? '-' : daysRemaining.toLocaleString('th-TH', { maximumFractionDigits: 1 })} <span className="text-xs font-semibold text-slate-500">วัน</span>
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-2 text-[11px] leading-4 text-slate-500">คำนวณจากยอดคงเหลือ ÷ ยอดใช้เฉลี่ย 7 วันที่มีบันทึกล่าสุด</p>
     </div>
   );
 }
