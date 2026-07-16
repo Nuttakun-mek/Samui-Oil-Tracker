@@ -10,15 +10,18 @@ import { getCurrentUserAccess, requirePageAccess } from '@/lib/auth/server';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
 import { computeStationInsights } from '@/lib/analytics/station-insight';
 import { LowStockBanner } from '@/components/low-stock-banner';
+import { ProcurementBalanceCard } from '@/components/procurement-balance-card';
+import { getProcurementSummary } from '@/lib/procurement';
 import Link from 'next/link';
 import { DatabaseZap, FileUp } from 'lucide-react';
 
 export const revalidate = 0; // always fetch fresh — ข้อมูลด้าน operational ต้องสดเสมอ
 
 export default async function DashboardPage() {
-  await requirePageAccess('dashboard');
+  const role = await requirePageAccess('dashboard');
 
   const supabase = await createClient();
+  const procurementSummary = await getProcurementSummary();
 
   // แดชบอร์ด (ภาพรวม) ให้ทุกบัญชีเห็นทุกพื้นที่โดยเจตนา — ต่างจาก history/reports/entry
   // ที่ยังจำกัดตามสิทธิ์สถานีของบัญชีตามปกติ จึงอ่านผ่าน admin client เพื่อข้าม RLS เฉพาะหน้านี้
@@ -107,6 +110,8 @@ export default async function DashboardPage() {
           {latestRecordDate ? ` ล่าสุด ${latestRecordDate}` : ''}
         </div>
       </div>
+
+      <ProcurementBalanceCard groups={procurementSummary.groups} isAdmin={role === 'admin'} />
 
       {recordList.length === 0 ? (
         <section className="panel flex min-h-72 flex-col items-center justify-center px-5 py-10 text-center">

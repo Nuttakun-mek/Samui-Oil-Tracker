@@ -11,12 +11,15 @@ import { AddMemberForm } from './add-member-form';
 import { DatabaseExportImportPanel } from './database-export-import-panel';
 import { ResetDataPanel } from './reset-data-panel';
 import { MembersTable, type MemberRow } from './members-table';
+import { ProcurementPanel } from './procurement-panel';
+import { getProcurementSummary } from '@/lib/procurement';
 
 export const revalidate = 0;
 
-type SettingsTab = 'stations' | 'reset' | 'import-excel' | 'import-db' | 'members' | 'audit';
+type SettingsTab = 'stations' | 'procurement' | 'reset' | 'import-excel' | 'import-db' | 'members' | 'audit';
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'stations', label: 'สถานี' },
+  { id: 'procurement', label: 'จัดซื้อล๊อตใหญ่' },
   { id: 'reset', label: 'ล้างข้อมูล' },
   { id: 'import-excel', label: 'นำเข้า Excel' },
   { id: 'import-db', label: 'นำเข้าฐานข้อมูล' },
@@ -67,6 +70,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     .eq('id', user?.id ?? '')
     .single();
   const isAdmin = profile?.role === 'admin';
+  const procurementSummary = isAdmin ? await getProcurementSummary() : null;
 
   let members: MemberRow[] = profileList.map((p) => ({
     id: p.id,
@@ -173,6 +177,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           ))}
         </div>
       </section>
+      )}
+
+      {isAdmin && tab === 'procurement' && procurementSummary && (
+        <ProcurementPanel summary={procurementSummary} />
       )}
 
       {isAdmin && tab === 'reset' && (
