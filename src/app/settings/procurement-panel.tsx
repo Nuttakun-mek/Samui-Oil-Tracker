@@ -229,7 +229,7 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
                   <td className="px-3 py-2 text-right tabular-nums">+{lot.quantityLiters.toLocaleString('th-TH')}</td>
                   <td className="px-3 py-2">{lot.addedBy ?? '-'}</td>
                   <td className="px-3 py-2 whitespace-nowrap tabular-nums">
-                    {new Date(lot.addedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
+                    {new Date(lot.addedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' })}
                   </td>
                   <td className="px-3 py-2">
                     <ContractDocuments contractId={lot.id} count={lot.documentsCount} canEdit />

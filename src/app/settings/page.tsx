@@ -281,7 +281,7 @@ export default async function SettingsPage({
                 )}
                 {auditRows.map((row) => (
                   <tr key={row.id} className="border-b border-slate-200 last:border-0 align-top hover:bg-slate-50">
-                    <td className="whitespace-nowrap px-3.5 py-3 tabular-nums">{new Date(row.changed_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                    <td className="whitespace-nowrap px-3.5 py-3 tabular-nums">{new Date(row.changed_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' })}</td>
                     <td className="px-3.5 py-3 font-semibold">{profileNameById.get(row.target_profile_id) ?? row.target_profile_id}</td>
                     <td className="px-3.5 py-3">{row.changed_by ? profileNameById.get(row.changed_by) ?? row.changed_by : '-'}</td>
                     <td className="px-3.5 py-3">

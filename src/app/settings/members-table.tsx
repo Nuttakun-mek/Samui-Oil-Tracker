@@ -19,7 +19,7 @@ export interface MemberRow {
 
 function formatDateTime(value: string | null) {
   if (!value) return '-';
-  return new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  return new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' });
 }
 
 function usePermissionFormSubmit() {
