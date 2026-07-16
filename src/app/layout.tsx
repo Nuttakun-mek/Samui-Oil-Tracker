@@ -15,7 +15,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     data: { user },
   } = await supabase.auth.getUser();
   const { data: profile } = user
-    ? await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    ? await supabase.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle()
     : { data: null };
   const role = normalizeRole(profile?.role);
   const navItems = APP_NAV_ITEMS.filter((item) => canAccessPage(role, item.id));
@@ -25,7 +25,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body suppressHydrationWarning>
         {user ? (
           <div className="flex min-h-screen flex-col">
-            <AppHeader email={user.email ?? 'ผู้ใช้งาน'} navItems={navItems} />
+            <AppHeader
+              displayName={profile?.full_name || user.email || 'ผู้ใช้งาน'}
+              email={user.email ?? ''}
+              role={role}
+              navItems={navItems}
+            />
             <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">{children}</main>
             <AppFooter />
           </div>

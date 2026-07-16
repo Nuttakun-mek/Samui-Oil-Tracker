@@ -43,6 +43,7 @@ export function DatePicker({
   onChange,
   min,
   max,
+  defaultViewMonth,
   ariaLabel,
 }: {
   id?: string;
@@ -50,6 +51,8 @@ export function DatePicker({
   onChange: (value: string) => void;
   min?: string;
   max?: string;
+  /** yyyy-MM ให้ปฏิทินเปิดที่เดือนนี้เมื่อยังไม่มีค่า — ใช้ sync กับตัวกรองเดือน/ช่วงวันที่ที่เลือกอยู่ */
+  defaultViewMonth?: string;
   ariaLabel?: string;
 }) {
   const { open, setOpen, ref } = usePopover<HTMLDivElement>();
@@ -57,6 +60,12 @@ export function DatePicker({
     ...(min ? [{ before: fromIsoDate(min)! }] : []),
     ...(max ? [{ after: fromIsoDate(max)! }] : []),
   ];
+  const openAtMonth =
+    fromIsoDate(value)
+    ?? (defaultViewMonth ? fromIsoDate(`${defaultViewMonth}-01`) : undefined)
+    ?? fromIsoDate(min ?? '')
+    ?? fromIsoDate(max ?? '')
+    ?? new Date();
 
   return (
     <div className="relative" ref={ref}>
@@ -76,7 +85,7 @@ export function DatePicker({
           <DayPicker
             mode="single"
             selected={fromIsoDate(value)}
-            defaultMonth={fromIsoDate(value) ?? new Date()}
+            defaultMonth={openAtMonth}
             onSelect={(date) => {
               if (!date) return;
               onChange(toIsoDate(date));

@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Paperclip } from 'lucide-react';
 import { STATION_LABEL, computeClosing, fuelRecordFormSchema, type FuelRecordFormValues, type Station } from '@/lib/types/domain';
 import { DatePicker } from '@/components/ui/date-picker';
+import { uploadRecordDocument } from '../documents/actions';
 import { upsertFuelRecord, getPreviousClosing } from './actions';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -13,6 +15,8 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<string | null>(null);
   const [previousDate, setPreviousDate] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const defaultStationId = stations[0]?.id ?? 'samui';
 
   const {
@@ -75,7 +79,24 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
     startTransition(async () => {
       const res = await upsertFuelRecord(values);
       if (res.ok) {
-        setToast(`บันทึกข้อมูล ${STATION_LABEL[values.station_id]} วันที่ ${values.record_date} เรียบร้อย`);
+        let attachmentNote = '';
+        if (attachments.length) {
+          let uploaded = 0;
+          const failures: string[] = [];
+          for (const file of attachments) {
+            const formData = new FormData();
+            formData.append('file', file);
+            const uploadResult = await uploadRecordDocument(res.recordId, formData);
+            if (uploadResult.ok) uploaded += 1;
+            else failures.push(`${file.name}: ${uploadResult.error}`);
+          }
+          attachmentNote = failures.length
+            ? ` — แนบเอกสารได้ ${uploaded}/${attachments.length} ไฟล์ (${failures[0]})`
+            : ` พร้อมเอกสารแนบ ${uploaded} ไฟล์`;
+          setAttachments([]);
+          if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+        }
+        setToast(`บันทึกข้อมูล ${STATION_LABEL[values.station_id]} วันที่ ${values.record_date} เรียบร้อย${attachmentNote}`);
         reset({
           ...values,
           received_liters: 0,
@@ -230,6 +251,26 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
             หมายเหตุ <span className="text-xs font-normal text-slate-500">เช่น เหตุการณ์ผิดปกติ หรือรายละเอียดประกอบ</span>
           </label>
           <input type="text" {...register('note')} className="field" />
+        </div>
+
+        <div>
+          <label className="field-label flex items-center gap-1.5">
+            <Paperclip size={13} aria-hidden="true" />
+            แนบเอกสาร <span className="text-xs font-normal text-slate-500">ใบส่งน้ำมัน รูปถ่าย ฯลฯ (PDF / รูปภาพ ไม่เกิน 10 MB ต่อไฟล์)</span>
+          </label>
+          <input
+            ref={attachmentInputRef}
+            type="file"
+            multiple
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            onChange={(event) => setAttachments(Array.from(event.target.files ?? []))}
+            className="field !py-1.5 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-brand-700"
+          />
+          {attachments.length > 0 && (
+            <p className="mt-1 text-xs text-slate-500">
+              จะอัปโหลด {attachments.length.toLocaleString('th-TH')} ไฟล์หลังบันทึกสำเร็จ: {attachments.map((file) => file.name).join(', ')}
+            </p>
+          )}
         </div>
 
         <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">

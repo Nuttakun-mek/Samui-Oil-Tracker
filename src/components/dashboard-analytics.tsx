@@ -50,8 +50,10 @@ function formatNumber(value: number) {
 }
 
 export function DashboardAnalytics({ stations, records }: { stations: Station[]; records: FuelRecord[] }) {
+  // บัญชีที่เข้าถึงได้สถานีเดียว ไม่ต้องมีตัวเลือก "ทุกพื้นที่"
+  const singleStation = stations.length === 1 ? stations[0].id : null;
   const [periodMode, setPeriodMode] = useState<PeriodMode>('monthly');
-  const [stationFilter, setStationFilter] = useState<StationFilter>('all');
+  const [stationFilter, setStationFilter] = useState<StationFilter>(singleStation ?? 'all');
   const [rangeMode, setRangeMode] = useState<RangeMode>('all');
   const [monthFilter, setMonthFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -111,7 +113,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
       : rangeMode === 'all'
         ? 'ข้อมูลทั้งหมด'
         : `${rangeMode} วันล่าสุด`;
-  const hasCustomFilters = stationFilter !== 'all'
+  const hasCustomFilters = stationFilter !== (singleStation ?? 'all')
     || rangeMode !== 'all'
     || Boolean(monthFilter || fromDate || toDate)
     || periodMode !== 'monthly';
@@ -150,7 +152,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
   };
 
   const resetFilters = () => {
-    setStationFilter('all');
+    setStationFilter(singleStation ?? 'all');
     setRangeMode('all');
     setMonthFilter('');
     setFromDate('');
@@ -175,6 +177,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
         <fieldset>
           <legend className="mb-2 text-xs font-extrabold text-slate-700">1. เลือกพื้นที่ข้อมูล</legend>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {!singleStation && (
             <button
               type="button"
               aria-pressed={stationFilter === 'all'}
@@ -182,8 +185,9 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
               className={`min-h-14 rounded-md border-l-4 px-3 py-2 text-left transition ${stationFilter === 'all' ? 'border-brand-600 bg-brand-600 text-white shadow-sm' : 'border-brand-300 bg-white text-slate-800 hover:bg-brand-50'}`}
             >
               <span className="block text-sm font-extrabold">ทุกพื้นที่</span>
-              <span className={`block text-xs ${stationFilter === 'all' ? 'text-white/70' : 'text-slate-500'}`}>รวมเกาะสมุย พะงัน และเต่า</span>
+              <span className={`block text-xs ${stationFilter === 'all' ? 'text-white/70' : 'text-slate-500'}`}>รวมพื้นที่ที่บัญชีนี้เข้าถึงได้</span>
             </button>
+            )}
             {stations.map((station) => {
               const selected = stationFilter === station.id;
               const label = STATION_SHORT[station.id];
@@ -229,15 +233,35 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
             <div className="grid gap-2 sm:grid-cols-3">
               <div>
                 <label className="sr-only" htmlFor="dashboard-month">เลือกเดือน</label>
-                <MonthPicker id="dashboard-month" ariaLabel="เลือกเดือน" value={monthFilter} onChange={selectMonth} />
+                <MonthPicker
+                  id="dashboard-month"
+                  ariaLabel="เลือกเดือน"
+                  value={monthFilter}
+                  defaultViewMonth={fromDate.slice(0, 7) || toDate.slice(0, 7) || latestDate?.slice(0, 7)}
+                  onChange={selectMonth}
+                />
               </div>
               <div>
                 <label className="sr-only" htmlFor="dashboard-from">ตั้งแต่วันที่</label>
-                <DatePicker id="dashboard-from" ariaLabel="ตั้งแต่วันที่" value={fromDate} max={toDate || undefined} onChange={(value) => selectDate('from', value)} />
+                <DatePicker
+                  id="dashboard-from"
+                  ariaLabel="ตั้งแต่วันที่"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  defaultViewMonth={monthFilter || toDate.slice(0, 7) || latestDate?.slice(0, 7)}
+                  onChange={(value) => selectDate('from', value)}
+                />
               </div>
               <div>
                 <label className="sr-only" htmlFor="dashboard-to">ถึงวันที่</label>
-                <DatePicker id="dashboard-to" ariaLabel="ถึงวันที่" value={toDate} min={fromDate || undefined} onChange={(value) => selectDate('to', value)} />
+                <DatePicker
+                  id="dashboard-to"
+                  ariaLabel="ถึงวันที่"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  defaultViewMonth={monthFilter || fromDate.slice(0, 7) || latestDate?.slice(0, 7)}
+                  onChange={(value) => selectDate('to', value)}
+                />
               </div>
             </div>
           </div>

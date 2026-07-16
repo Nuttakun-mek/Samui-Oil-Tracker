@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { computeClosing, fuelRecordFormSchema, type FuelRecordFormValues } from '@/lib/types/domain';
 import { getCurrentUserAccess, requireAdmin, requirePageAccess } from '@/lib/auth/server';
 
@@ -40,7 +41,7 @@ export async function upsertFuelRecord(raw: FuelRecordFormValues) {
     return { ok: false as const, error: 'ยอดคงเหลือเกินความจุถังของพื้นที่นี้' };
   }
 
-  const { error } = await supabase
+  const { data: saved, error } = await supabase
     .from('fuel_records')
     .upsert(
       {
@@ -65,20 +66,34 @@ export async function upsertFuelRecord(raw: FuelRecordFormValues) {
         updated_by: uid,
       },
       { onConflict: 'station_id,record_date' }
-    );
+    )
+    .select('id')
+    .single();
 
   if (error) return { ok: false as const, error: error.message };
 
   revalidatePath('/dashboard');
   revalidatePath('/entry');
   revalidatePath('/history');
-  return { ok: true as const };
+  return { ok: true as const, recordId: saved.id as string };
 }
 
 export async function deleteFuelRecord(id: string) {
   await requireAdmin();
 
   const supabase = await createClient();
+
+  // ลบไฟล์เอกสารแนบใน storage ก่อน — FK cascade ลบได้เฉพาะแถว metadata ไม่ลบไฟล์จริง
+  const { data: documents } = await supabase.from('fuel_record_documents').select('file_path').eq('record_id', id);
+  if (documents?.length) {
+    try {
+      const admin = createAdminClient();
+      await admin.storage.from('fuel-documents').remove(documents.map((doc) => doc.file_path as string));
+    } catch {
+      // ไม่มี service key: ยอมให้ไฟล์ค้างใน storage ดีกว่า block การลบ record
+    }
+  }
+
   const { error } = await supabase.from('fuel_records').delete().eq('id', id);
   if (error) return { ok: false as const, error: error.message };
 

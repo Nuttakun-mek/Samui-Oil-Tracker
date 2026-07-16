@@ -3,6 +3,7 @@ import { STATION_IDS, STATION_LABEL, type FuelRecord } from '@/lib/types/domain'
 import Link from 'next/link';
 import { DeleteButton } from './delete-button';
 import { EditRecordButton } from './edit-record-button';
+import { RecordDocuments } from './record-documents';
 import { getCurrentUserAccess, requirePageAccess } from '@/lib/auth/server';
 
 export const revalidate = 0;
@@ -110,10 +111,18 @@ export default async function HistoryPage({
   const { data } = await query;
   const records = (data ?? []) as FuelRecord[];
   const profileIds = Array.from(new Set(records.flatMap((record) => [record.created_by, record.updated_by]).filter(Boolean))) as string[];
-  const { data: profiles } = profileIds.length
-    ? await supabase.from('profiles').select('id, full_name').in('id', profileIds)
-    : { data: [] };
+  const [{ data: profiles }, { data: documentRows }] = await Promise.all([
+    profileIds.length
+      ? supabase.from('profiles').select('id, full_name').in('id', profileIds)
+      : Promise.resolve({ data: [] as ProfileLite[] }),
+    supabase.from('fuel_record_documents').select('record_id'),
+  ]);
   const profileMap = new Map((profiles ?? []).map((profile: ProfileLite) => [profile.id, profile.full_name ?? profile.id]));
+  const documentCounts = new Map<string, number>();
+  for (const row of documentRows ?? []) {
+    const recordId = row.record_id as string;
+    documentCounts.set(recordId, (documentCounts.get(recordId) ?? 0) + 1);
+  }
   const recordChecks = checkHistoryRecords(records);
   const checkMap = new Map<string, RecordCheck[]>();
   recordChecks.forEach((check) => {
@@ -205,6 +214,7 @@ export default async function HistoryPage({
                 <div className="mt-1 text-xs font-semibold text-slate-500">ผู้รายงาน {reporterText(r, profileMap)}</div>
               </div>
               <div className="flex shrink-0 gap-2">
+                <RecordDocuments recordId={r.id} count={documentCounts.get(r.id) ?? 0} canEdit={role !== 'viewer'} />
                 {role !== 'viewer' && <EditRecordButton record={r} allowedStationIds={access.stationIds} />}
                 {role === 'admin' && <DeleteButton id={r.id} />}
               </div>
@@ -296,6 +306,7 @@ export default async function HistoryPage({
                 </td>
                 <td className="px-3.5 py-2.5">
                   <div className="flex justify-end gap-2">
+                    <RecordDocuments recordId={r.id} count={documentCounts.get(r.id) ?? 0} canEdit={role !== 'viewer'} />
                     {role !== 'viewer' && <EditRecordButton record={r} allowedStationIds={access.stationIds} />}
                     {role === 'admin' && <DeleteButton id={r.id} />}
                   </div>

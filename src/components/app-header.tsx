@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BarChart3, ClipboardPenLine, FileText, History, Menu, Settings, X } from 'lucide-react';
 import { useState } from 'react';
-import type { AppPageId } from '@/lib/auth/page-access';
+import type { AppPageId, UserRole } from '@/lib/auth/page-access';
 import { LogoutButton } from '@/components/logout-button';
 
 type NavItem = {
@@ -14,7 +14,9 @@ type NavItem = {
 };
 
 interface AppHeaderProps {
+  displayName: string;
   email: string;
+  role: UserRole;
   navItems: NavItem[];
 }
 
@@ -26,7 +28,13 @@ const NAV_ICONS = {
   settings: Settings,
 } as const;
 
-export function AppHeader({ email, navItems }: AppHeaderProps) {
+const ROLE_LABEL: Record<UserRole, string> = {
+  admin: 'ผู้ดูแลระบบ',
+  editor: 'ผู้บันทึกข้อมูล',
+  viewer: 'ผู้ใช้งานทั่วไป',
+};
+
+export function AppHeader({ displayName, email, role, navItems }: AppHeaderProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -43,7 +51,13 @@ export function AppHeader({ email, navItems }: AppHeaderProps) {
           </Link>
 
           <div className="hidden shrink-0 items-center gap-2 md:flex">
-            <span className="max-w-52 truncate rounded-md border border-white/10 bg-white/10 px-3 py-2 text-xs text-white/80">{email}</span>
+            <div className="max-w-60 rounded-md border border-white/10 bg-white/10 px-3 py-1.5 text-right">
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="truncate text-xs font-bold text-white">{displayName}</span>
+                <span className="shrink-0 rounded bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-200">{ROLE_LABEL[role]}</span>
+              </div>
+              {email && email !== displayName && <div className="truncate text-[10px] text-white/60">{email}</div>}
+            </div>
             <LogoutButton />
           </div>
 
@@ -95,7 +109,11 @@ export function AppHeader({ email, navItems }: AppHeaderProps) {
             </nav>
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/15 pt-3">
               <div className="min-w-0">
-                <span className="block truncate text-xs text-white/70">{email}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-xs font-bold text-white">{displayName}</span>
+                  <span className="shrink-0 rounded bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-200">{ROLE_LABEL[role]}</span>
+                </div>
+                {email && email !== displayName && <span className="block truncate text-[10px] text-white/60">{email}</span>}
               </div>
               <LogoutButton />
             </div>

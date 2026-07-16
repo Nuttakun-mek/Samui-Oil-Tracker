@@ -49,7 +49,7 @@ export function ReportFilter({
     <div className="grid gap-3 border-y border-slate-200 py-4 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_1fr_1fr_auto_auto] xl:items-end">
       <div>
         <label className="field-label" htmlFor="report-month">เลือกเดือน</label>
-        <MonthPicker id="report-month" value={month} onChange={selectMonth} />
+        <MonthPicker id="report-month" value={month} defaultViewMonth={from.slice(0, 7) || to.slice(0, 7)} onChange={selectMonth} />
       </div>
       <div>
         <label className="field-label" htmlFor="report-station">พื้นที่</label>
@@ -60,11 +60,11 @@ export function ReportFilter({
       </div>
       <div>
         <label className="field-label" htmlFor="report-from">ตั้งแต่วันที่</label>
-        <DatePicker id="report-from" value={from} max={to || undefined} onChange={(value) => selectDate('from', value)} />
+        <DatePicker id="report-from" value={from} max={to || undefined} defaultViewMonth={month || to.slice(0, 7)} onChange={(value) => selectDate('from', value)} />
       </div>
       <div>
         <label className="field-label" htmlFor="report-to">ถึงวันที่</label>
-        <DatePicker id="report-to" value={to} min={from || undefined} onChange={(value) => selectDate('to', value)} />
+        <DatePicker id="report-to" value={to} min={from || undefined} defaultViewMonth={month || from.slice(0, 7)} onChange={(value) => selectDate('to', value)} />
       </div>
       <a href={validRange ? `/reports?${query}` : '#'} aria-disabled={!validRange} className={`btn-secondary justify-center ${!validRange ? 'pointer-events-none opacity-50' : ''}`}>
         <Search size={17} aria-hidden="true" />

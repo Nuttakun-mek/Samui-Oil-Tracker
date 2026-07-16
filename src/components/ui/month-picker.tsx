@@ -9,15 +9,19 @@ export function MonthPicker({
   id,
   value,
   onChange,
+  defaultViewMonth,
   ariaLabel,
 }: {
   id?: string;
   value: string;
   onChange: (value: string) => void;
+  /** yyyy-MM ให้ตัวเลือกปีเปิดที่ปีนี้เมื่อยังไม่มีค่า — ใช้ sync กับช่วงวันที่ที่เลือกอยู่ */
+  defaultViewMonth?: string;
   ariaLabel?: string;
 }) {
   const { open, setOpen, ref } = usePopover<HTMLDivElement>();
-  const [year, month] = value ? value.split('-').map(Number) : [new Date().getFullYear(), null];
+  const fallbackYear = defaultViewMonth ? Number(defaultViewMonth.slice(0, 4)) : new Date().getFullYear();
+  const [year, month] = value ? value.split('-').map(Number) : [fallbackYear, null];
   const [viewYear, setViewYear] = useState(year);
 
   const selectMonth = (monthIndex: number) => {
