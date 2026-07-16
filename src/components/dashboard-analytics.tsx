@@ -26,7 +26,7 @@ type StationFilter = 'all' | StationId;
 
 const STATION_SHORT: Record<StationId, { title: string; detail: string; buttonAccent: string; cardAccent: string }> = {
   samui: { title: 'เกาะสมุย', detail: 'สถานีไฟฟ้าสมุย 1 · บ้านพังกา', buttonAccent: 'border-l-brand-600', cardAccent: 'border-t-brand-600' },
-  phangan: { title: 'เกาะพะงัน', detail: 'เครื่องกำเนิดไฟฟ้า · ลิปะน้อย', buttonAccent: 'border-l-gold-500', cardAccent: 'border-t-gold-500' },
+  phangan: { title: 'ลิปะน้อย (เกาะสมุย)', detail: 'เครื่องกำเนิดไฟฟ้าชั่วคราว', buttonAccent: 'border-l-gold-500', cardAccent: 'border-t-gold-500' },
   koh_tao: { title: 'เกาะเต่า', detail: 'โรงจักรเกาะเต่า', buttonAccent: 'border-l-slate-500', cardAccent: 'border-t-slate-500' },
 };
 

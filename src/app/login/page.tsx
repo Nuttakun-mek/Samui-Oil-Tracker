@@ -38,7 +38,7 @@ export default function LoginPage() {
               <Building2 size={24} aria-hidden="true" />
             </div>
             <h1 className="mt-8 max-w-md text-3xl font-extrabold !leading-snug sm:text-4xl">
-              ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุย เกาะพะงัน และเกาะเต่า
+              ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุยและเกาะเต่า
             </h1>
             <p className="mt-3 text-xs font-extrabold tracking-wide text-gold-200">Island Oil Tracker</p>
           </div>

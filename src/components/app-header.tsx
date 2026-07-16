@@ -74,7 +74,7 @@ export function AppHeader({ displayName, email, role, navItems }: AppHeaderProps
         <div className="flex min-h-16 items-center justify-between gap-3">
           <Link href="/dashboard" className="min-w-0 py-2" onClick={() => setIsOpen(false)}>
             <h1 className="line-clamp-2 text-sm font-extrabold leading-5 sm:text-base lg:truncate">
-              ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุย เกาะพะงัน และเกาะเต่า
+              ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุยและเกาะเต่า
             </h1>
             <div className="mt-0.5 text-[11px] font-bold tracking-wide text-gold-200">Island Oil Tracker</div>
           </Link>

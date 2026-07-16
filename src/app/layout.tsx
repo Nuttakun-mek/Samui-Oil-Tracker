@@ -6,7 +6,7 @@ import { AppFooter } from '@/components/app-footer';
 import { APP_NAV_ITEMS, canAccessPage, normalizeRole } from '@/lib/auth/page-access';
 
 export const metadata: Metadata = {
-  title: 'ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุย เกาะพะงัน และเกาะเต่า | Island Oil Tracker',
+  title: 'ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุยและเกาะเต่า | Island Oil Tracker',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
