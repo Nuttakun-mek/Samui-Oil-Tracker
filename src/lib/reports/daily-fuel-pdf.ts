@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { formatThaiDate, formatThaiDateShort } from '@/lib/format/thai-date';
-import { STATION_LABEL, type FuelRecord, type Station } from '@/lib/types/domain';
+import { STATION_IDS, STATION_LABEL, type FuelRecord, type Station } from '@/lib/types/domain';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
 import { buildTrendBuckets, computeStationInsights, findAnomalies, suggestPeriodMode, type StationInsight } from '@/lib/analytics/station-insight';
 import { drawTrendChart } from './pdf-chart';
@@ -14,15 +14,15 @@ const CONTENT_BOTTOM = PAGE_HEIGHT - MARGIN - 16;
 
 type Column = { label: string; width: number; align?: 'left' | 'right' };
 const COLUMNS: Column[] = [
-  { label: 'วันที่', width: 62 },
-  { label: 'พื้นที่', width: 164 },
-  { label: 'ยกมา', width: 72, align: 'right' },
-  { label: 'รับเข้า', width: 66, align: 'right' },
-  { label: 'พร้อมใช้', width: 72, align: 'right' },
-  { label: 'จ่ายออก', width: 68, align: 'right' },
-  { label: 'คงเหลือ', width: 72, align: 'right' },
-  { label: 'ผู้รายงาน', width: 68 },
-  { label: 'แหล่งข้อมูล', width: TABLE_WIDTH - 644 },
+  { label: 'วันที่', width: 66 },
+  { label: 'ยกมา', width: 82, align: 'right' },
+  { label: 'รับเข้า', width: 78, align: 'right' },
+  { label: 'พร้อมใช้', width: 82, align: 'right' },
+  { label: 'จ่ายออก', width: 78, align: 'right' },
+  { label: 'คงเหลือ', width: 82, align: 'right' },
+  { label: 'ค่าใช้จ่าย', width: 92, align: 'right' },
+  { label: 'ผู้รายงาน', width: 82 },
+  { label: 'แหล่งข้อมูล', width: TABLE_WIDTH - 642 },
 ];
 
 const STATUS_LABEL: Record<StationInsight['status'], string> = { danger: 'วิกฤต', warn: 'เฝ้าระวัง', ok: 'ปกติ' };
@@ -171,27 +171,6 @@ export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], f
 
     drawExecutiveSummary(doc, stations, records, from, to);
 
-    doc.addPage({ size: 'A4', layout: 'landscape', margin: MARGIN });
-    doc.font('Thai');
-
-    const drawTitle = () => {
-      doc.fillColor('#0f172a').fontSize(16).text('รายงานน้ำมันเชื้อเพลิงรายวัน - ทุกพื้นที่', MARGIN, MARGIN, { width: TABLE_WIDTH });
-      doc.fontSize(9).fillColor('#475569').text(`${formatThaiDate(from)} ถึง ${formatThaiDate(to)}`, MARGIN, MARGIN + 23);
-      const totalReceived = records.reduce((sum, record) => sum + record.received_liters, 0);
-      const totalDispatched = records.reduce((sum, record) => sum + record.dispatched_liters, 0);
-      const totalCost = estimatedFuelCost(stations, records);
-      doc.text(`บันทึก ${records.length.toLocaleString('th-TH')} รายการ | รับเข้า ${number(totalReceived)} ลิตร | จ่ายออก ${number(totalDispatched)} ลิตร | งบประมาณ ${totalCost.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`, MARGIN, MARGIN + 38);
-      let x = MARGIN;
-      stations.forEach((station) => {
-        const stationRecords = records.filter((record) => record.station_id === station.id);
-        const latest = stationRecords.at(-1);
-        const stationCost = estimatedFuelCost([station], stationRecords);
-        doc.fillColor('#0f766e').fontSize(8).text(`${STATION_LABEL[station.id]}: ${stationRecords.length.toLocaleString('th-TH')} รายการ${latest ? `, คงเหลือ ${number(latest.closing_liters)} ลิตร` : ''}, งบ ${stationCost.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`, x, MARGIN + 54, { width: TABLE_WIDTH / Math.max(stations.length, 1) - 8 });
-        x += TABLE_WIDTH / Math.max(stations.length, 1);
-      });
-      return MARGIN + 78;
-    };
-
     const drawTableHeader = (y: number) => {
       doc.rect(MARGIN, y, TABLE_WIDTH, 22).fill('#0f172a');
       let x = MARGIN;
@@ -203,46 +182,153 @@ export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], f
       return y + 22;
     };
 
-    let y = drawTableHeader(drawTitle());
-    records.forEach((record, index) => {
-      const rowHeight = 27;
-      if (y + rowHeight > PAGE_HEIGHT - 35) {
+    const orderedStations = [...stations].sort((a, b) => STATION_IDS.indexOf(a.id) - STATION_IDS.indexOf(b.id));
+    orderedStations.forEach((station) => {
+      const stationRecords = records.filter((record) => record.station_id === station.id);
+      const stationReceived = stationRecords.reduce((sum, record) => sum + record.received_liters, 0);
+      const stationDispatched = stationRecords.reduce((sum, record) => sum + record.dispatched_liters, 0);
+      const stationCost = estimatedFuelCost([station], stationRecords);
+      const latestClosing = stationRecords.at(-1)?.closing_liters;
+      const insight = computeStationInsights([station], stationRecords)[0];
+      const anomalies = findAnomalies([station], stationRecords);
+      const stationBuckets = buildTrendBuckets(stationRecords, suggestPeriodMode(from, to));
+      const sourceCounts = stationRecords.reduce<Record<FuelRecord['record_source'], number>>(
+        (counts, record) => ({ ...counts, [record.record_source]: counts[record.record_source] + 1 }),
+        { manual: 0, upload: 0, database: 0 }
+      );
+
+      const drawStationOverview = () => {
         doc.addPage({ size: 'A4', layout: 'landscape', margin: MARGIN });
         doc.font('Thai');
-        doc.fillColor('#475569').fontSize(8).text(`รายงานน้ำมันรายวัน ${formatThaiDate(from)} - ${formatThaiDate(to)}`, MARGIN, 18);
-        y = drawTableHeader(32);
-      }
+        doc.fillColor('#722257').fontSize(16).text(STATION_LABEL[station.id], MARGIN, MARGIN, { width: TABLE_WIDTH - 110 });
+        doc.fontSize(9).fillColor('#475569').text(`ภาพรวมและกราฟวิเคราะห์  ·  ${formatThaiDate(from)} ถึง ${formatThaiDate(to)}`, MARGIN, MARGIN + 24);
+        doc.roundedRect(PAGE_WIDTH - MARGIN - 92, MARGIN, 92, 24, 4).fillAndStroke(
+          insight.status === 'danger' ? '#fef2f2' : insight.status === 'warn' ? '#fffbeb' : '#ecfdf5',
+          STATUS_COLOR[insight.status]
+        );
+        doc.fontSize(8).fillColor(STATUS_COLOR[insight.status]).text(`สถานะ: ${STATUS_LABEL[insight.status]}`, PAGE_WIDTH - MARGIN - 86, MARGIN + 7, { width: 80, align: 'center' });
 
-      if (index % 2 === 1) doc.rect(MARGIN, y, TABLE_WIDTH, rowHeight).fill('#f8fafc');
-      const values = [
-        formatThaiDateShort(record.record_date),
-        STATION_LABEL[record.station_id],
-        number(record.opening_liters),
-        number(record.received_liters),
-        number(record.opening_liters + record.received_liters),
-        number(record.dispatched_liters),
-        number(record.closing_liters),
-        record.employee_code || '-',
-        sourceLabel(record.record_source),
-      ];
-      let x = MARGIN;
-      doc.fillColor('#1e293b').fontSize(7.2);
-      COLUMNS.forEach((column, columnIndex) => {
-        doc.text(values[columnIndex], x + 4, y + 5, { width: column.width - 8, height: rowHeight - 6, align: column.align ?? 'left', ellipsis: true });
-        x += column.width;
+        const stationKpis = [
+          { label: 'รับเข้ารวม', value: `${number(stationReceived)} ลิตร` },
+          { label: 'จ่ายออกรวม', value: `${number(stationDispatched)} ลิตร` },
+          { label: 'คงเหลือล่าสุด', value: latestClosing === undefined ? '-' : `${number(latestClosing)} ลิตร` },
+          { label: 'ใช้เฉลี่ย 7 รายการล่าสุด', value: `${number(insight.averageDaily)} ลิตร/วัน` },
+          { label: 'ประมาณการใช้ได้อีก', value: insight.daysRemaining === null ? 'ข้อมูลไม่เพียงพอ' : `${insight.daysRemaining.toFixed(1)} วัน` },
+          { label: 'งบประมาณโดยประมาณ', value: `${stationCost.toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท` },
+        ];
+        const kpiY = MARGIN + 52;
+        const kpiGap = 7;
+        const kpiWidth = (TABLE_WIDTH - kpiGap * (stationKpis.length - 1)) / stationKpis.length;
+        stationKpis.forEach((kpi, index) => {
+          const x = MARGIN + index * (kpiWidth + kpiGap);
+          doc.roundedRect(x, kpiY, kpiWidth, 43, 4).fillAndStroke('#f8fafc', '#e2e8f0');
+          doc.fontSize(7).fillColor('#64748b').text(kpi.label, x + 7, kpiY + 7, { width: kpiWidth - 14 });
+          doc.fontSize(9.5).fillColor('#0f172a').text(kpi.value, x + 7, kpiY + 22, { width: kpiWidth - 14, ellipsis: true });
+        });
+
+        const chartY = kpiY + 58;
+        doc.fontSize(10).fillColor('#0f172a').text('แนวโน้มรับเข้า จ่ายออก และคงเหลือ', MARGIN, chartY);
+        drawTrendChart(doc, { x: MARGIN, y: chartY + 17, width: TABLE_WIDTH, height: 174 }, stationBuckets);
+
+        const insightY = chartY + 204;
+        doc.fontSize(10).fillColor('#0f172a').text('ข้อมูลสำคัญในช่วงที่เลือก', MARGIN, insightY);
+        const netChange = stationReceived - stationDispatched;
+        const insightLines = [
+          insight.peak
+            ? `วันที่ใช้สูงสุด ${formatThaiDate(insight.peak.record_date)} จำนวน ${number(insight.peak.dispatched_liters)} ลิตร`
+            : 'ยังไม่มีข้อมูลวันที่ใช้สูงสุด',
+          `สมดุลรับเข้าเทียบจ่ายออก ${netChange >= 0 ? '+' : ''}${number(netChange)} ลิตร`,
+          insight.trendPct === null
+            ? 'ข้อมูลยังไม่เพียงพอสำหรับเปรียบเทียบแนวโน้ม 7 รายการล่าสุด'
+            : `แนวโน้มการใช้ 7 รายการล่าสุด${insight.trendPct >= 0 ? 'เพิ่มขึ้น' : 'ลดลง'} ${Math.abs(insight.trendPct).toFixed(1)}% จากช่วงก่อนหน้า`,
+          insight.daysRemaining !== null && insight.etaDate
+            ? `คาดว่าใช้ได้อีก ${insight.daysRemaining.toFixed(1)} วัน หรือถึงประมาณ ${formatThaiDate(insight.etaDate)}`
+            : 'ยังประเมินจำนวนวันที่ใช้ได้ไม่เพียงพอ',
+          anomalies.length
+            ? `พบวันที่ใช้น้ำมันสูงผิดปกติ ${anomalies.length.toLocaleString('th-TH')} วัน (มากกว่า 2 เท่าของค่าเฉลี่ย)`
+            : 'ไม่พบวันที่ใช้น้ำมันสูงเกิน 2 เท่าของค่าเฉลี่ย',
+        ];
+        doc.fontSize(8).fillColor('#1e293b');
+        let lineY = insightY + 17;
+        insightLines.forEach((line) => {
+          doc.text(`•  ${line}`, MARGIN, lineY, { width: TABLE_WIDTH * 0.66, lineGap: 1 });
+          lineY = doc.y + 3;
+        });
+
+        const sourceX = MARGIN + TABLE_WIDTH * 0.7;
+        doc.roundedRect(sourceX, insightY, TABLE_WIDTH * 0.3, 90, 4).fillAndStroke('#ffffff', '#e2e8f0');
+        doc.fontSize(9).fillColor('#0f172a').text('คุณภาพและที่มาของข้อมูล', sourceX + 9, insightY + 9, { width: TABLE_WIDTH * 0.3 - 18 });
+        doc.fontSize(7.5).fillColor('#475569').text(
+          [
+            `วันที่มีข้อมูล ${insight.activeDays.toLocaleString('th-TH')} วัน`,
+            `พนักงานกรอก ${sourceCounts.manual.toLocaleString('th-TH')} รายการ`,
+            `อัปโหลดไฟล์ ${sourceCounts.upload.toLocaleString('th-TH')} รายการ`,
+            `ฐานข้อมูลย้อนหลัง ${sourceCounts.database.toLocaleString('th-TH')} รายการ`,
+            `ราคาคำนวณ ${station.fuel_price_per_liter.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท/ลิตร`,
+          ].join('\n'),
+          sourceX + 9,
+          insightY + 27,
+          { width: TABLE_WIDTH * 0.3 - 18, lineGap: 2 }
+        );
+      };
+
+      const drawStationHeading = (continued = false) => {
+        doc.fillColor('#722257').fontSize(14).text(`รายละเอียดรายวัน - ${STATION_LABEL[station.id]}${continued ? ' (ต่อ)' : ''}`, MARGIN, MARGIN, { width: TABLE_WIDTH });
+        doc.fontSize(8.5).fillColor('#475569').text(`${formatThaiDate(from)} ถึง ${formatThaiDate(to)}`, MARGIN, MARGIN + 22);
+        doc.fontSize(8.5).fillColor('#1e293b').text(
+          `บันทึก ${stationRecords.length.toLocaleString('th-TH')} รายการ  |  รับเข้า ${number(stationReceived)} ลิตร  |  จ่ายออก ${number(stationDispatched)} ลิตร  |  คงเหลือล่าสุด ${latestClosing === undefined ? '-' : `${number(latestClosing)} ลิตร`}  |  ค่าใช้จ่าย ${stationCost.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`,
+          MARGIN,
+          MARGIN + 38,
+          { width: TABLE_WIDTH }
+        );
+        return MARGIN + 58;
+      };
+
+      drawStationOverview();
+      doc.addPage({ size: 'A4', layout: 'landscape', margin: MARGIN });
+      doc.font('Thai');
+      let y = drawTableHeader(drawStationHeading());
+
+      stationRecords.forEach((record, index) => {
+        const rowHeight = 27;
+        if (y + rowHeight > PAGE_HEIGHT - 35) {
+          doc.addPage({ size: 'A4', layout: 'landscape', margin: MARGIN });
+          doc.font('Thai');
+          y = drawTableHeader(drawStationHeading(true));
+        }
+
+        if (index % 2 === 1) doc.rect(MARGIN, y, TABLE_WIDTH, rowHeight).fill('#f8fafc');
+        const values = [
+          formatThaiDateShort(record.record_date),
+          number(record.opening_liters),
+          number(record.received_liters),
+          number(record.opening_liters + record.received_liters),
+          number(record.dispatched_liters),
+          number(record.closing_liters),
+          (record.dispatched_liters * station.fuel_price_per_liter).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          record.employee_code || '-',
+          sourceLabel(record.record_source),
+        ];
+        let x = MARGIN;
+        doc.fillColor('#1e293b').fontSize(7.2);
+        COLUMNS.forEach((column, columnIndex) => {
+          doc.text(values[columnIndex], x + 4, y + 5, { width: column.width - 8, height: rowHeight - 6, align: column.align ?? 'left', ellipsis: true });
+          x += column.width;
+        });
+        doc.moveTo(MARGIN, y + rowHeight).lineTo(MARGIN + TABLE_WIDTH, y + rowHeight).strokeColor('#e2e8f0').lineWidth(0.5).stroke();
+        y += rowHeight;
       });
-      doc.moveTo(MARGIN, y + rowHeight).lineTo(MARGIN + TABLE_WIDTH, y + rowHeight).strokeColor('#e2e8f0').lineWidth(0.5).stroke();
-      y += rowHeight;
-    });
 
-    if (!records.length) {
-      doc.fillColor('#64748b').fontSize(11).text('ไม่พบข้อมูลในช่วงวันที่ที่เลือก', MARGIN, y + 24, { width: TABLE_WIDTH, align: 'center' });
-    }
+      if (!stationRecords.length) {
+        doc.fillColor('#64748b').fontSize(11).text('ไม่พบข้อมูลของพื้นที่นี้ในช่วงวันที่ที่เลือก', MARGIN, y + 28, { width: TABLE_WIDTH, align: 'center' });
+      }
+    });
 
     const range = doc.bufferedPageRange();
     for (let page = range.start; page < range.start + range.count; page += 1) {
       doc.switchToPage(page);
-      doc.font('Thai').fillColor('#64748b').fontSize(7).text(`Island Oil Tracker ${APP_RELEASE.label} | หน้า ${page + 1} / ${range.count}`, MARGIN, PAGE_HEIGHT - MARGIN - 10, { width: TABLE_WIDTH, align: 'right' });
+      doc.font('Thai').fillColor('#64748b').fontSize(7).text('แผนกแผนบริหารความต่อเนื่องทางธุรกิจ การไฟฟ้าส่วนภูมิภาค โทร. 9517', MARGIN, PAGE_HEIGHT - MARGIN - 10, { width: TABLE_WIDTH * 0.65 });
+      doc.text(`Island Oil Tracker ${APP_RELEASE.label} | หน้า ${page - range.start + 1} / ${range.count}`, MARGIN, PAGE_HEIGHT - MARGIN - 10, { width: TABLE_WIDTH, align: 'right' });
     }
     doc.end();
   });

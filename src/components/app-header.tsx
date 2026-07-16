@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, ClipboardPenLine, FileText, History, Menu, Settings, X } from 'lucide-react';
+import { BarChart3, ChevronDown, ClipboardPenLine, FileText, History, Mail, Menu, Settings, ShieldCheck, X } from 'lucide-react';
 import { useState } from 'react';
 import type { AppPageId, UserRole } from '@/lib/auth/page-access';
 import { LogoutButton } from '@/components/logout-button';
@@ -46,18 +46,52 @@ function getInitials(name: string) {
   return name.trim().slice(0, 2).toUpperCase();
 }
 
-function UserChip({ displayName, email, role }: { displayName: string; email: string; role: UserRole }) {
+function UserAvatar({ displayName }: { displayName: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 py-1.5 pl-1.5 pr-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold-500 text-xs font-extrabold text-brand-900">
-        {getInitials(displayName)}
-      </div>
-      <div className="min-w-0 text-left">
-        <div className="truncate text-xs font-bold leading-tight text-white">{displayName}</div>
-        <div className="mt-0.5 flex items-center gap-1.5">
-          <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ${ROLE_BADGE_CLASS[role]}`}>{ROLE_LABEL[role]}</span>
-          {email && email !== displayName && <span className="truncate text-[10px] leading-none text-white/50">{email}</span>}
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-500 text-xs font-extrabold text-brand-900">
+      {getInitials(displayName)}
+    </div>
+  );
+}
+
+function DesktopUserMenu({ displayName, email, role }: { displayName: string; email: string; role: UserRole }) {
+  return (
+    <details className="group relative">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md border border-white/15 bg-white/5 py-1.5 pl-1.5 pr-2.5 transition hover:bg-white/10 [&::-webkit-details-marker]:hidden">
+        <UserAvatar displayName={displayName} />
+        <div className="max-w-44 min-w-0 text-left">
+          <div className="truncate text-xs font-bold leading-4 text-white">{displayName}</div>
+          <div className="mt-0.5 text-[10px] font-semibold leading-3 text-gold-100">{ROLE_LABEL[role]}</div>
         </div>
+        <ChevronDown size={14} className="text-white/60 transition group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-lg border border-slate-200 bg-white p-3 text-slate-900 shadow-xl">
+        <div className="flex items-start gap-3 border-b border-slate-100 pb-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-extrabold text-brand-800">
+            {getInitials(displayName)}
+          </div>
+          <div className="min-w-0">
+            <p className="break-words text-sm font-extrabold leading-5 text-slate-950">{displayName}</p>
+            <p className="mt-0.5 flex items-start gap-1.5 break-all text-xs leading-5 text-slate-500"><Mail size={13} className="mt-1 shrink-0" aria-hidden="true" />{email || '-'}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-700"><ShieldCheck size={15} className="text-brand-600" aria-hidden="true" />{ROLE_LABEL[role]}</div>
+          <div className="rounded-md bg-brand-700"><LogoutButton compact /></div>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function MobileUserProfile({ displayName, email, role }: { displayName: string; email: string; role: UserRole }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-start gap-3">
+      <UserAvatar displayName={displayName} />
+      <div className="min-w-0 text-left">
+        <p className="break-words text-sm font-bold leading-5 text-white">{displayName}</p>
+        <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ${ROLE_BADGE_CLASS[role]}`}>{ROLE_LABEL[role]}</span>
+        {email && email !== displayName && <p className="mt-1 break-all text-xs leading-5 text-white/55">{email}</p>}
       </div>
     </div>
   );
@@ -72,16 +106,15 @@ export function AppHeader({ displayName, email, role, navItems }: AppHeaderProps
       <div className="h-1 bg-gold-500" />
       <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
         <div className="flex min-h-16 items-center justify-between gap-3">
-          <Link href="/dashboard" className="min-w-0 py-2" onClick={() => setIsOpen(false)}>
-            <h1 className="line-clamp-2 text-sm font-extrabold leading-5 sm:text-base lg:truncate">
+          <Link href="/dashboard" className="min-w-0 max-w-[900px] py-2" onClick={() => setIsOpen(false)}>
+            <h1 className="line-clamp-2 text-sm font-extrabold leading-5 sm:text-base lg:text-[17px]">
               ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุยและเกาะเต่า
             </h1>
             <div className="mt-0.5 text-[11px] font-bold tracking-wide text-gold-200">Island Oil Tracker</div>
           </Link>
 
           <div className="hidden shrink-0 items-center gap-2.5 md:flex">
-            <UserChip displayName={displayName} email={email} role={role} />
-            <LogoutButton />
+            <DesktopUserMenu displayName={displayName} email={email} role={role} />
           </div>
 
           <button
@@ -131,8 +164,8 @@ export function AppHeader({ displayName, email, role, navItems }: AppHeaderProps
               })}
             </nav>
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/15 pt-3">
-              <UserChip displayName={displayName} email={email} role={role} />
-              <LogoutButton />
+              <MobileUserProfile displayName={displayName} email={email} role={role} />
+              <div className="shrink-0 rounded-md bg-white/5"><LogoutButton compact /></div>
             </div>
           </div>
         )}

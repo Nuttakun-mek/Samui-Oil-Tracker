@@ -1,0 +1,13 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/backup-weekly",
+      "schedule": "0 19 * * 6"
+    },
+    {
+      "path": "/api/cron/backup-monthly",
+      "schedule": "30 19 * * *"
+    }
+  ]
+}
+

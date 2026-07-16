@@ -1,4 +1,4 @@
-# ระบบติดตามการใช้น้ำมันเชื้อเพลิง 3 พื้นที่
+# ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุย เกาะพะงัน และเกาะเต่า
 
 Next.js 15 + Supabase (Postgres, Auth, RLS) + Vercel
 
@@ -16,6 +16,13 @@ Next.js 15 + Supabase (Postgres, Auth, RLS) + Vercel
    - `supabase/migrations/0008_add_source_sheet_tracking.sql` — ชื่อ sheet/แท็บต้นทาง
    - `supabase/migrations/0009_add_database_export_import_tables.sql` — ตารางประกอบสำหรับชุด database export
    - `supabase/migrations/0010_admin_reset_operational_data.sql` — RPC สำหรับล้างข้อมูลนำเข้าโดย admin
+   - `supabase/migrations/0011_add_daily_entry_references.sql` - ทะเบียนรถ เอกสารอ้างอิง และสัญญา
+   - `supabase/migrations/0012_add_station_fuel_price.sql` - ราคาน้ำมันต่อพื้นที่
+   - `supabase/migrations/0013_permission_audit.sql` - ประวัติการเปลี่ยนสิทธิ์
+   - `supabase/migrations/0014_add_viewer_role.sql` - บทบาท editor และ viewer
+   - `supabase/migrations/0015_fuel_record_documents.sql` - เอกสารแนบรายการน้ำมัน
+   - `supabase/migrations/0016_fuel_procurement_groups.sql` - สัญญา ล็อตจัดซื้อ และเอกสารสัญญา
+   - `supabase/migrations/0017_add_backup_restore_system.sql` - Backup/Restore ผ่าน Google Drive
 3. สร้างผู้ใช้ admin คนแรก: Authentication > Users > Add user (กรอกอีเมล/รหัสผ่าน)
    จากนั้นรัน SQL นี้เพื่อตั้งเป็น admin และให้สิทธิ์ทุกสถานี:
    ```sql
@@ -73,7 +80,7 @@ vercel env add NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 vercel --prod
 ```
 
-หรือเชื่อม repo ผ่าน Vercel dashboard แล้วตั้งค่า env vars 2 ตัวข้างต้นในหน้า Project Settings > Environment Variables
+หรือเชื่อม repo ผ่าน Vercel dashboard แล้วตั้งค่า env vars ตาม `.env.example` ในหน้า Project Settings > Environment Variables
 
 ### Release version
 
@@ -92,9 +99,27 @@ SUPABASE_PROJECT_ID=xxxx npm run db:types
 
 ## โครงสร้างสิทธิ์ (RLS)
 
-- `role = 'admin'` — เห็น/แก้ไขทุกสถานี, แก้ค่าตั้งค่าถัง, ลบข้อมูลได้, ดู audit log ได้
-- `role = 'field'` — เห็น/แก้ไขได้เฉพาะสถานีที่มีใน `profile_station_access`, ลบไม่ได้ (ลบได้เฉพาะ admin ตาม policy `fuel_records_delete`)
+- `role = 'admin'` - เห็นและจัดการทุกพื้นที่ สมาชิก สิทธิ์ Backup และ Restore
+- `role = 'editor'` - ดูและบันทึกได้เฉพาะพื้นที่ใน `profile_station_access`
+- `role = 'viewer'` - ดูข้อมูลและรายงานได้ แต่แก้ไขรายการไม่ได้
 - ทุกการ insert/update/delete บน `fuel_records` ถูกบันทึกลง `fuel_records_audit` อัตโนมัติผ่าน trigger — ตรวจสอบย้อนหลังได้ว่าใครแก้อะไรเมื่อไหร่
+
+## Backup และ Restore
+
+ระบบสร้าง Full Snapshot แยกไฟล์ทุกครั้ง ไม่เขียนทับไฟล์เก่า โดยรวมข้อมูลธุรกิจ สิทธิ์ ประวัติ และไฟล์ใน private Storage bucket `fuel-documents` ไว้ในไฟล์ `.oilbackup` ที่บีบอัดและเข้ารหัส AES-256-GCM
+
+- รายสัปดาห์: วันอาทิตย์ 02:00 น. เวลาไทย เก็บ 3 ชุด
+- รายเดือน: วันที่ 1 เวลา 02:30 น. เวลาไทย เก็บ 12 ชุด
+- ป้องกันไฟล์ล่าสุด 3 ชุดเสมอ
+- Manual Backup ถูกปักหมุดเป็นค่าเริ่มต้น
+- ลบอัตโนมัติหลังดาวน์โหลดไฟล์กลับมาตรวจ SHA-256 สำเร็จเท่านั้น
+- หากรอบรายสัปดาห์และรายเดือนตรงวันเดียวกัน ระบบใช้ไฟล์เดียวและติด tag ทั้งสองรอบ
+
+ตั้งค่า Google OAuth 2.0 Web application ให้ callback มาที่ `/api/settings/backups/google/callback` และเพิ่ม env ตาม `.env.example` ค่า `BACKUP_MASTER_KEY` ต้องเก็บไว้นอกระบบและใช้ค่าเดิมเมื่อต้องย้ายระบบ เพราะใช้ถอดรหัสไฟล์สำรอง
+
+`BACKUP_RESTORE_ENABLED` ปิดเป็นค่าเริ่มต้น ก่อน Restore ระบบจะสร้าง Manual Backup ที่ปักหมุดไว้เป็น rollback point แล้วจึงแทนที่ข้อมูล รหัสผ่านและ session ของ Supabase Auth ไม่ถูก export หาก Restore ไปโปรเจกต์ใหม่ ระบบสร้างบัญชีที่ขาดด้วยรหัสผ่านสุ่มและผู้ดูแลต้องตั้งรหัสผ่านใหม่ให้สมาชิก
+
+Vercel Cron ใช้ UTC ใน `vercel.json`: รายสัปดาห์ `0 19 * * 6` และ route รายเดือนทำงานทุกวันเวลา `19:30 UTC` แต่จะสร้าง Backup เฉพาะเมื่อเป็นวันที่ 1 ในเขตเวลา Asia/Bangkok
 
 ## โครงสร้างข้อมูลหลัก
 

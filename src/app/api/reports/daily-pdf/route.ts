@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { getCurrentUserAccess } from '@/lib/auth/server';
 import { createDailyFuelPdf } from '@/lib/reports/daily-fuel-pdf';
 import { createClient } from '@/lib/supabase/server';
@@ -29,14 +31,13 @@ export async function GET(request: NextRequest) {
   if (error) return new Response(error.message, { status: 500 });
 
   try {
-    const fontResponse = await fetch(new URL('/fonts/Sarabun-Regular.ttf', request.nextUrl.origin), { cache: 'force-cache' });
-    if (!fontResponse.ok) return new Response('Unable to load PDF font', { status: 500 });
-    const thaiFont = Buffer.from(await fontResponse.arrayBuffer());
+    const thaiFont = await readFile(path.join(process.cwd(), 'public', 'fonts', 'Sarabun-Regular.ttf'));
     const pdf = await createDailyFuelPdf((stations ?? []) as Station[], (records ?? []) as FuelRecord[], from, to, thaiFont);
+    const scope = stationIds.length === 1 ? stationIds[0] : 'all-stations';
     return new Response(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="oil-daily-report-${from}-to-${to}.pdf"`,
+        'Content-Disposition': `attachment; filename="oil-daily-report-${scope}-${from}-to-${to}.pdf"`,
         'Cache-Control': 'no-store',
       },
     });

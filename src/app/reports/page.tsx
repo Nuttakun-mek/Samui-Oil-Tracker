@@ -2,7 +2,7 @@ import { FileText } from 'lucide-react';
 import { getCurrentUserAccess, requirePageAccess } from '@/lib/auth/server';
 import { createClient } from '@/lib/supabase/server';
 import { formatThaiDate } from '@/lib/format/thai-date';
-import { STATION_LABEL, type FuelRecord, type Station, type StationId } from '@/lib/types/domain';
+import { STATION_IDS, STATION_LABEL, type FuelRecord, type Station, type StationId } from '@/lib/types/domain';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
 import { ReportFilter } from './report-filter';
 
@@ -15,6 +15,12 @@ function asDate(value: string | string[] | undefined) {
 
 function number(value: number) {
   return Math.round(value).toLocaleString('th-TH');
+}
+
+function recordSourceLabel(source: FuelRecord['record_source']) {
+  if (source === 'database') return 'ฐานข้อมูลย้อนหลัง';
+  if (source === 'upload') return 'อัปโหลดไฟล์';
+  return 'พนักงานกรอก';
 }
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -50,7 +56,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .order('station_id'),
   ]);
 
-  const stationList = (stations ?? []) as Station[];
+  const stationList = ((stations ?? []) as Station[]).sort((a, b) => STATION_IDS.indexOf(a.id) - STATION_IDS.indexOf(b.id));
   const recordList = (records ?? []) as FuelRecord[];
   const received = recordList.reduce((sum, record) => sum + record.received_liters, 0);
   const dispatched = recordList.reduce((sum, record) => sum + record.dispatched_liters, 0);
@@ -72,6 +78,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <ReportFilter initialFrom={from} initialTo={to} initialStation={selectedStation} stations={stationList} />
 
+      <div className="flex flex-col gap-1 border-l-4 border-brand-600 bg-brand-50 px-4 py-3 text-sm text-brand-950 sm:flex-row sm:items-center sm:justify-between">
+        <span className="font-bold">{selectedStation === 'all' ? 'มุมมองรวมทั้ง 3 พื้นที่' : STATION_LABEL[selectedStation as StationId]}</span>
+        <span className="text-xs leading-5 text-brand-700">PDF หน้าแรกเป็นสรุปรวม และแต่ละพื้นที่เริ่มในหน้าใหม่</span>
+      </div>
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="border-l-4 border-slate-900 pl-3">
           <div className="text-xs font-bold text-slate-500">จำนวนบันทึก</div>
@@ -91,46 +102,68 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </div>
       </section>
 
-      <div className="table-shell">
-        <table className="w-full min-w-[1380px] text-sm">
-          <thead>
-            <tr className="table-header">
-              <th className="px-3 py-2 text-left">วันที่</th>
-              <th className="px-3 py-2 text-left">พื้นที่</th>
-              <th className="px-3 py-2 text-right">ยกมา</th>
-              <th className="px-3 py-2 text-right">รับเข้า</th>
-              <th className="px-3 py-2 text-right">พร้อมใช้</th>
-              <th className="px-3 py-2 text-right">จ่ายออก</th>
-              <th className="px-3 py-2 text-right">คงเหลือ</th>
-              <th className="px-3 py-2 text-right">ประมาณการค่าใช้จ่าย</th>
-              <th className="px-3 py-2 text-left">ผู้รายงาน</th>
-              <th className="px-3 py-2 text-left">แหล่งข้อมูล</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recordList.slice(0, 200).map((record) => (
-              <tr key={record.id} className="border-t border-slate-200">
-                <td className="whitespace-nowrap px-3 py-2">{formatThaiDate(record.record_date)}</td>
-                <td className="px-3 py-2 font-semibold">{STATION_LABEL[record.station_id]}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{number(record.opening_liters)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{number(record.received_liters)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{number(record.opening_liters + record.received_liters)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{number(record.dispatched_liters)}</td>
-                <td className="px-3 py-2 text-right font-bold tabular-nums">{number(record.closing_liters)}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                  {(record.dispatched_liters * (priceByStation.get(record.station_id) ?? 0)).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
-                </td>
-                <td className="px-3 py-2">{record.employee_code || '-'}</td>
-                <td className="px-3 py-2">{record.record_source === 'database' ? 'ฐานข้อมูลย้อนหลัง' : record.record_source === 'upload' ? 'อัปโหลดไฟล์' : 'พนักงานกรอก'}</td>
-              </tr>
-            ))}
-            {!recordList.length && (
-              <tr><td colSpan={10} className="px-3 py-10 text-center text-slate-500">ไม่พบข้อมูลในช่วงวันที่ที่เลือก</td></tr>
-            )}
-          </tbody>
-        </table>
+      <div className="space-y-8">
+        {stationList.map((station) => {
+          const stationRecords = recordList.filter((record) => record.station_id === station.id);
+          const stationReceived = stationRecords.reduce((sum, record) => sum + record.received_liters, 0);
+          const stationDispatched = stationRecords.reduce((sum, record) => sum + record.dispatched_liters, 0);
+          const latestClosing = stationRecords.at(-1)?.closing_liters;
+          return (
+            <section key={station.id} aria-labelledby={`station-report-${station.id}`}>
+              <div className="mb-3 flex flex-col gap-3 border-b border-slate-200 pb-3 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-gold-700">รายงานพื้นที่</p>
+                  <h2 id={`station-report-${station.id}`} className="mt-0.5 text-lg font-extrabold leading-7 text-brand-950">{STATION_LABEL[station.id]}</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+                  <div><span className="block text-xs text-slate-500">รายการ</span><strong>{stationRecords.length.toLocaleString('th-TH')}</strong></div>
+                  <div><span className="block text-xs text-slate-500">รับเข้า</span><strong className="text-emerald-700">{number(stationReceived)}</strong></div>
+                  <div><span className="block text-xs text-slate-500">จ่ายออก</span><strong className="text-amber-700">{number(stationDispatched)}</strong></div>
+                  <div><span className="block text-xs text-slate-500">คงเหลือล่าสุด</span><strong>{latestClosing === undefined ? '-' : number(latestClosing)}</strong></div>
+                </div>
+              </div>
+
+              <div className="table-shell">
+                <table className="w-full min-w-[1120px] text-sm">
+                  <thead>
+                    <tr className="table-header">
+                      <th className="px-3 py-2 text-left">วันที่</th>
+                      <th className="px-3 py-2 text-right">ยกมา</th>
+                      <th className="px-3 py-2 text-right">รับเข้า</th>
+                      <th className="px-3 py-2 text-right">พร้อมใช้</th>
+                      <th className="px-3 py-2 text-right">จ่ายออก</th>
+                      <th className="px-3 py-2 text-right">คงเหลือ</th>
+                      <th className="px-3 py-2 text-right">ประมาณการค่าใช้จ่าย</th>
+                      <th className="px-3 py-2 text-left">ผู้รายงาน</th>
+                      <th className="px-3 py-2 text-left">แหล่งข้อมูล</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stationRecords.map((record) => (
+                      <tr key={record.id} className="border-t border-slate-200 even:bg-slate-50/60">
+                        <td className="whitespace-nowrap px-3 py-2">{formatThaiDate(record.record_date)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{number(record.opening_liters)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{number(record.received_liters)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{number(record.opening_liters + record.received_liters)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{number(record.dispatched_liters)}</td>
+                        <td className="px-3 py-2 text-right font-bold tabular-nums">{number(record.closing_liters)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                          {(record.dispatched_liters * (priceByStation.get(record.station_id) ?? 0)).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท
+                        </td>
+                        <td className="px-3 py-2">{record.employee_code || '-'}</td>
+                        <td className="px-3 py-2">{recordSourceLabel(record.record_source)}</td>
+                      </tr>
+                    ))}
+                    {!stationRecords.length && (
+                      <tr><td colSpan={9} className="px-3 py-10 text-center text-slate-500">ไม่พบข้อมูลของพื้นที่นี้ในช่วงวันที่ที่เลือก</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          );
+        })}
       </div>
-      {recordList.length > 200 && <p className="text-xs text-slate-500">หน้าจอแสดง 200 รายการแรก ส่วน PDF แสดงข้อมูลครบทั้งหมด</p>}
     </div>
   );
 }

@@ -13,13 +13,17 @@ import { ResetDataPanel } from './reset-data-panel';
 import { MembersTable, type MemberRow } from './members-table';
 import { ProcurementPanel } from './procurement-panel';
 import { getProcurementSummary } from '@/lib/procurement';
+import { BackupRestorePanel } from './backup-restore-panel';
+import type { BackupJobRow, BackupSettingsRow } from '@/lib/backups/types';
 
 export const revalidate = 0;
+export const maxDuration = 300;
 
-type SettingsTab = 'stations' | 'procurement' | 'reset' | 'import-excel' | 'import-db' | 'members' | 'audit';
+type SettingsTab = 'stations' | 'procurement' | 'backup' | 'reset' | 'import-excel' | 'import-db' | 'members' | 'audit';
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'stations', label: 'สถานี' },
   { id: 'procurement', label: 'จัดซื้อล๊อตใหญ่' },
+  { id: 'backup', label: 'สำรองและกู้คืน' },
   { id: 'reset', label: 'ล้างข้อมูล' },
   { id: 'import-excel', label: 'นำเข้า Excel' },
   { id: 'import-db', label: 'นำเข้าฐานข้อมูล' },
@@ -27,10 +31,14 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'audit', label: 'ประวัติการเปลี่ยนสิทธิ์' },
 ];
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; connected?: string; error?: string }>;
+}) {
   await requirePageAccess('settings');
 
-  const { tab: rawTab } = await searchParams;
+  const { tab: rawTab, connected, error: oauthError } = await searchParams;
   const tab: SettingsTab = TABS.some((item) => item.id === rawTab) ? (rawTab as SettingsTab) : 'stations';
 
   const supabase = await createClient();
@@ -93,6 +101,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     changed_at: string;
   }> = [];
   let adminToolsError: string | null = null;
+  let backupSettings: Omit<BackupSettingsRow, 'google_refresh_token_encrypted'> | null = null;
+  let backupJobs: BackupJobRow[] = [];
+  let backupSchemaReady = false;
+  let backupSetupError: string | null = null;
 
   if (isAdmin) {
     try {
@@ -126,6 +138,25 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       auditRows = audit ?? [];
     } catch {
       adminToolsError = 'ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY ใน .env.local จึงแสดงอีเมล/ประวัติสิทธิ์ไม่ได้ (แก้ไข role/สถานีได้ตามปกติ)';
+    }
+
+    try {
+      const admin = createAdminClient();
+      const [{ data: settings, error: settingsError }, { data: jobs, error: jobsError }] = await Promise.all([
+        admin
+          .from('backup_settings')
+          .select('id,enabled,timezone,weekly_day,weekly_time,weekly_retention,monthly_day,monthly_time,monthly_retention,protect_latest,google_connected_email,google_drive_folder_id,connected_at,last_backup_at,last_verified_at,updated_at')
+          .eq('id', true)
+          .single(),
+        admin.from('backup_jobs').select('*').order('created_at', { ascending: false }).limit(50),
+      ]);
+      if (settingsError) throw settingsError;
+      if (jobsError) throw jobsError;
+      backupSettings = settings as Omit<BackupSettingsRow, 'google_refresh_token_encrypted'>;
+      backupJobs = (jobs ?? []) as BackupJobRow[];
+      backupSchemaReady = true;
+    } catch (error) {
+      backupSetupError = error instanceof Error ? error.message : 'อ่านการตั้งค่า Backup ไม่สำเร็จ';
     }
   }
 
@@ -181,6 +212,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       {isAdmin && tab === 'procurement' && procurementSummary && (
         <ProcurementPanel summary={procurementSummary} />
+      )}
+
+      {isAdmin && tab === 'backup' && (
+        <BackupRestorePanel
+          settings={backupSettings}
+          jobs={backupJobs}
+          schemaReady={backupSchemaReady}
+          setupError={backupSetupError}
+          restoreEnabled={process.env.BACKUP_RESTORE_ENABLED === 'true'}
+          oauthMessage={connected === '1' ? 'เชื่อม Google Drive สำเร็จ' : oauthError ? `เชื่อม Google Drive ไม่สำเร็จ: ${oauthError}` : null}
+        />
       )}
 
       {isAdmin && tab === 'reset' && (
