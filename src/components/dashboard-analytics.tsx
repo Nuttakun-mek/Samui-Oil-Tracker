@@ -346,7 +346,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="received" name="รับเข้า (ลิตร)" fill="#2a78d6" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="dispatched" name="ใช้ออก (ลิตร)" fill="#1baf7a" radius={[3, 3, 0, 0]} />
-                  <Line type="monotone" dataKey="closing" name="คงเหลือ (ลิตร)" stroke="#eda100" strokeWidth={3} dot={false} />
+                  <Line type="monotone" dataKey="closing" name="คงเหลือ (ลิตร)" stroke="#eda100" strokeWidth={3} dot={{ r: 3.5, strokeWidth: 0, fill: '#eda100' }} activeDot={{ r: 5 }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

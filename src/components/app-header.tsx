@@ -34,6 +34,35 @@ const ROLE_LABEL: Record<UserRole, string> = {
   viewer: 'ผู้ใช้งานทั่วไป',
 };
 
+const ROLE_BADGE_CLASS: Record<UserRole, string> = {
+  admin: 'bg-gold-500/25 text-gold-100',
+  editor: 'bg-white/15 text-white/90',
+  viewer: 'bg-white/10 text-white/70',
+};
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.trim().slice(0, 2).toUpperCase();
+}
+
+function UserChip({ displayName, email, role }: { displayName: string; email: string; role: UserRole }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 py-1.5 pl-1.5 pr-3">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold-500 text-xs font-extrabold text-brand-900">
+        {getInitials(displayName)}
+      </div>
+      <div className="min-w-0 text-left">
+        <div className="truncate text-xs font-bold leading-tight text-white">{displayName}</div>
+        <div className="mt-0.5 flex items-center gap-1.5">
+          <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none ${ROLE_BADGE_CLASS[role]}`}>{ROLE_LABEL[role]}</span>
+          {email && email !== displayName && <span className="truncate text-[10px] leading-none text-white/50">{email}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppHeader({ displayName, email, role, navItems }: AppHeaderProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
@@ -50,14 +79,8 @@ export function AppHeader({ displayName, email, role, navItems }: AppHeaderProps
             <div className="mt-0.5 text-[11px] font-bold tracking-wide text-gold-200">Island Oil Tracker</div>
           </Link>
 
-          <div className="hidden shrink-0 items-center gap-2 md:flex">
-            <div className="max-w-60 rounded-md border border-white/10 bg-white/10 px-3 py-1.5 text-right">
-              <div className="flex items-center justify-end gap-1.5">
-                <span className="truncate text-xs font-bold text-white">{displayName}</span>
-                <span className="shrink-0 rounded bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-200">{ROLE_LABEL[role]}</span>
-              </div>
-              {email && email !== displayName && <div className="truncate text-[10px] text-white/60">{email}</div>}
-            </div>
+          <div className="hidden shrink-0 items-center gap-2.5 md:flex">
+            <UserChip displayName={displayName} email={email} role={role} />
             <LogoutButton />
           </div>
 
@@ -108,13 +131,7 @@ export function AppHeader({ displayName, email, role, navItems }: AppHeaderProps
               })}
             </nav>
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/15 pt-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-xs font-bold text-white">{displayName}</span>
-                  <span className="shrink-0 rounded bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold text-gold-200">{ROLE_LABEL[role]}</span>
-                </div>
-                {email && email !== displayName && <span className="block truncate text-[10px] text-white/60">{email}</span>}
-              </div>
+              <UserChip displayName={displayName} email={email} role={role} />
               <LogoutButton />
             </div>
           </div>

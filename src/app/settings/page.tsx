@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { STATION_LABEL, type Station } from '@/lib/types/domain';
 import type { UserRole } from '@/lib/auth/page-access';
-import { updateStationSettings } from './actions';
+import { StationSettingsForm } from './station-settings-form';
 import { OPERATIONAL_DATA_TABLES, type OperationalDataCounts } from './reset-data-config';
 import { requirePageAccess } from '@/lib/auth/server';
 import { ImportRecordsPanel } from './import-records-panel';
@@ -169,48 +169,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {list.map((st) => (
-            <form key={st.id} action={updateStationSettings} className="panel space-y-3">
-              <input type="hidden" name="id" value={st.id} />
-              <h4 className="text-sm font-extrabold leading-5 text-slate-950">{st.name}</h4>
-              <div>
-                <label className="field-label">ความจุถังสำรอง (ลิตร)</label>
-                <input
-                  name="tank_capacity_liters"
-                  type="number"
-                  defaultValue={st.tank_capacity_liters}
-                  className="field"
-                  disabled={!isAdmin}
-                />
-              </div>
-              <div>
-                <label className="field-label">แจ้งเตือนเมื่อเหลือใช้ได้น้อยกว่า (วัน)</label>
-                <input
-                  name="low_stock_days"
-                  type="number"
-                  defaultValue={st.low_stock_days}
-                  className="field"
-                  disabled={!isAdmin}
-                />
-              </div>
-              <div>
-                <label className="field-label">ราคาน้ำมันต่อลิตร (บาท)</label>
-                <input
-                  name="fuel_price_per_liter"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  defaultValue={st.fuel_price_per_liter}
-                  className="field"
-                  disabled={!isAdmin}
-                />
-                <p className="mt-1 text-xs text-slate-500">ใช้คูณยอดจ่ายออกเพื่อแสดงงบประมาณโดยประมาณ</p>
-              </div>
-              {isAdmin && (
-                <button type="submit" className="btn-primary w-full sm:w-auto">
-                  บันทึก
-                </button>
-              )}
-            </form>
+            <StationSettingsForm key={st.id} station={st} isAdmin={isAdmin} />
           ))}
         </div>
       </section>

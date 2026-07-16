@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Building2, LockKeyhole, Phone, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { APP_RELEASE } from '@/lib/app-version';
@@ -12,7 +11,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -20,13 +18,14 @@ export default function LoginPage() {
     setError(null);
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
     if (signInError) {
+      setLoading(false);
       setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
       return;
     }
-    router.push('/dashboard');
-    router.refresh();
+    // hard navigation แทน router.push+refresh — รับประกันว่า cookie session ใหม่ถูกใช้ทันที
+    // ไม่ต้องรอ client router timing (สาเหตุที่ Enter/คลิกเข้าระบบเคยรู้สึกหน่วง)
+    window.location.href = '/dashboard';
   };
 
   return (
@@ -38,7 +37,7 @@ export default function LoginPage() {
             <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/20 bg-white/10">
               <Building2 size={24} aria-hidden="true" />
             </div>
-            <h1 className="mt-8 max-w-md text-3xl font-extrabold leading-snug sm:text-4xl">
+            <h1 className="mt-8 max-w-md text-3xl font-extrabold !leading-snug sm:text-4xl">
               ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุย เกาะพะงัน และเกาะเต่า
             </h1>
             <p className="mt-3 text-xs font-extrabold tracking-wide text-gold-200">Island Oil Tracker</p>
@@ -47,8 +46,8 @@ export default function LoginPage() {
           <div className="mt-8 flex items-center gap-3 border-t border-white/15 pt-5 lg:mt-12">
             <ShieldCheck size={17} className="mt-0.5 shrink-0 text-gold-200" aria-hidden="true" />
             <div>
-              <p className="text-xs font-bold leading-5">แผนกแผนบริหารความต่อเนื่องทางธุรกิจ การไฟฟ้าส่วนภูมิภาค</p>
-              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-white/70"><Phone size={12} aria-hidden="true" /> โทร. 9517</p>
+              <p className="text-xs leading-5 text-white/50">แผนกแผนบริหารความต่อเนื่องทางธุรกิจ การไฟฟ้าส่วนภูมิภาค</p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-white/50"><Phone size={12} aria-hidden="true" /> โทร. 9517</p>
               <p className="mt-1 font-mono text-[10px] text-white/50">{APP_RELEASE.environmentLabel} · {APP_RELEASE.label}</p>
             </div>
           </div>

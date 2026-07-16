@@ -22,6 +22,36 @@ function formatDateTime(value: string | null) {
   return new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function usePermissionFormSubmit() {
+  const [message, setMessage] = useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    setMessage(null);
+    startTransition(async () => {
+      const result = await updateUserPermissions(formData);
+      setIsSuccess(result.ok);
+      setMessage(result.ok ? 'บันทึกสิทธิ์แล้ว' : result.error);
+      if (result.ok) setTimeout(() => setMessage(null), 3000);
+    });
+  };
+
+  return { message, isSuccess, isPending, onSubmit };
+}
+
+function SaveFeedback({ message, isSuccess }: { message: string | null; isSuccess: boolean }) {
+  if (!message) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-bold ${isSuccess ? 'text-brand-700' : 'text-red-600'}`}>
+      {isSuccess && <CheckCircle2 size={13} aria-hidden="true" />}
+      {message}
+    </span>
+  );
+}
+
 function PasswordResetControl({ profileId }: { profileId: string }) {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
@@ -99,6 +129,160 @@ function ActiveToggleControl({ profileId, active, isSelf }: { profileId: string;
   );
 }
 
+interface MemberRowProps {
+  member: MemberRow;
+  stations: Station[];
+  access: Set<string>;
+  currentUserId: string;
+}
+
+function MemberMobileCard({ member, stations, access, currentUserId }: MemberRowProps) {
+  const role = normalizeRole(member.role);
+  const permissionForm = usePermissionFormSubmit();
+  const formId = `permission-mobile-${member.id}`;
+
+  return (
+    <article className="panel space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-extrabold text-slate-950">{member.full_name || 'ยังไม่ระบุชื่อ'}</div>
+          <div className="truncate text-xs text-slate-600">{member.email || member.id}</div>
+          <div className="mt-0.5 text-[11px] text-slate-400">เข้าระบบล่าสุด {formatDateTime(member.lastSignInAt)}</div>
+        </div>
+        <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-bold ${member.active ? 'bg-brand-50 text-brand-700' : 'bg-red-50 text-red-700'}`}>
+          {member.active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
+        </span>
+      </div>
+
+      <form id={formId} onSubmit={permissionForm.onSubmit} className="space-y-3">
+        <input type="hidden" name="profile_id" value={member.id} />
+        <div>
+          <label className="field-label">Role</label>
+          <select name="role" defaultValue={role} className="field">
+            <option value="viewer">viewer — ดูอย่างเดียว</option>
+            <option value="editor">editor — แก้ไขได้</option>
+            <option value="admin">admin — สิทธิ์เต็ม</option>
+          </select>
+        </div>
+      </form>
+
+      <div>
+        <div className="field-label">สิทธิ์เข้าหน้า</div>
+        <div className="flex flex-wrap gap-1.5">
+          {APP_NAV_ITEMS.map((item) => (
+            <span key={item.id} className={`chip !px-2.5 !py-1 !text-xs ${canAccessPage(role, item.id) ? 'chip-active' : 'opacity-40'}`}>
+              {item.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="field-label">สถานี</div>
+        <div className="grid gap-2">
+          {stations.map((station) => (
+            <label key={station.id} className="inline-flex items-start gap-2 text-sm">
+              <input
+                form={formId}
+                type="checkbox"
+                name="station_ids"
+                value={station.id}
+                defaultChecked={role === 'admin' || access.has(station.id)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+              />
+              <span className="leading-5">{STATION_LABEL[station.id as StationId] ?? station.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2.5">
+        <button form={formId} type="submit" disabled={permissionForm.isPending} className="btn-primary flex-1">
+          {permissionForm.isPending ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์'}
+        </button>
+        <SaveFeedback message={permissionForm.message} isSuccess={permissionForm.isSuccess} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+        <PasswordResetControl profileId={member.id} />
+        <ActiveToggleControl profileId={member.id} active={member.active} isSelf={member.id === currentUserId} />
+      </div>
+    </article>
+  );
+}
+
+function MemberTableRow({ member, stations, access, currentUserId }: MemberRowProps) {
+  const role = normalizeRole(member.role);
+  const permissionForm = usePermissionFormSubmit();
+  const formId = `permission-${member.id}`;
+
+  return (
+    <tr className="border-b border-slate-200 last:border-0 align-top hover:bg-slate-50">
+      <td className="px-3.5 py-3 min-w-56">
+        <div className="font-bold text-slate-950">{member.full_name || 'ยังไม่ระบุชื่อ'}</div>
+        <div className="text-xs text-slate-600">{member.email || member.id}</div>
+        <div className="mt-0.5 text-[11px] text-slate-400">เข้าระบบล่าสุด {formatDateTime(member.lastSignInAt)}</div>
+      </td>
+      <td className="px-3.5 py-3">
+        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold ${member.active ? 'bg-brand-50 text-brand-700' : 'bg-red-50 text-red-700'}`}>
+          {member.active ? <ShieldCheck size={12} aria-hidden="true" /> : <Ban size={12} aria-hidden="true" />}
+          {member.active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
+        </span>
+      </td>
+      <td className="px-3.5 py-3">
+        <form id={formId} onSubmit={permissionForm.onSubmit} className="space-y-3">
+          <input type="hidden" name="profile_id" value={member.id} />
+          <select name="role" defaultValue={role} className="field min-w-28">
+            <option value="viewer">viewer</option>
+            <option value="editor">editor</option>
+            <option value="admin">admin</option>
+          </select>
+        </form>
+      </td>
+      <td className="px-3.5 py-3 min-w-52">
+        <div className="flex flex-wrap gap-1.5">
+          {APP_NAV_ITEMS.map((item) => (
+            <span key={item.id} className={`chip !px-2.5 !py-1 !text-xs ${canAccessPage(role, item.id) ? 'chip-active' : 'opacity-40'}`}>
+              {item.label}
+            </span>
+          ))}
+        </div>
+      </td>
+      <td className="px-3.5 py-3 min-w-64">
+        <div className="grid gap-2">
+          {stations.map((station) => (
+            <label key={station.id} className="inline-flex items-center gap-2 text-sm">
+              <input
+                form={formId}
+                type="checkbox"
+                name="station_ids"
+                value={station.id}
+                defaultChecked={role === 'admin' || access.has(station.id)}
+                className="h-4 w-4 accent-brand-600"
+              />
+              <span>{STATION_LABEL[station.id as StationId] ?? station.name}</span>
+            </label>
+          ))}
+        </div>
+      </td>
+      <td className="px-3.5 py-3 min-w-40">
+        <div className="flex flex-col items-start gap-2">
+          <PasswordResetControl profileId={member.id} />
+          <ActiveToggleControl profileId={member.id} active={member.active} isSelf={member.id === currentUserId} />
+        </div>
+      </td>
+      <td className="px-3.5 py-3 text-right">
+        <div className="flex flex-col items-end gap-1.5">
+          <button form={formId} type="submit" disabled={permissionForm.isPending} className="btn-primary whitespace-nowrap">
+            {permissionForm.isPending ? 'กำลังบันทึก...' : 'บันทึกสิทธิ์'}
+          </button>
+          <SaveFeedback message={permissionForm.message} isSuccess={permissionForm.isSuccess} />
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export function MembersTable({
   members,
   stations,
@@ -135,76 +319,15 @@ export function MembersTable({
 
       <div className="grid gap-3 lg:hidden">
         {filtered.length === 0 && <div className="panel py-10 text-center text-sm text-slate-500">ไม่พบผู้ใช้</div>}
-        {filtered.map((member) => {
-          const role = normalizeRole(member.role);
-          const access = new Set(accessByProfile[member.id] ?? []);
-
-          return (
-            <article key={member.id} className="panel space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm font-extrabold text-slate-950">{member.full_name || 'ยังไม่ระบุชื่อ'}</div>
-                  <div className="truncate text-xs text-slate-600">{member.email || member.id}</div>
-                  <div className="mt-0.5 text-[11px] text-slate-400">เข้าระบบล่าสุด {formatDateTime(member.lastSignInAt)}</div>
-                </div>
-                <span className={`shrink-0 rounded-md px-2 py-1 text-[11px] font-bold ${member.active ? 'bg-brand-50 text-brand-700' : 'bg-red-50 text-red-700'}`}>
-                  {member.active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
-                </span>
-              </div>
-
-              <form id={`permission-mobile-${member.id}`} action={updateUserPermissions} className="space-y-3">
-                <input type="hidden" name="profile_id" value={member.id} />
-                <div>
-                  <label className="field-label">Role</label>
-                  <select name="role" defaultValue={role} className="field">
-                    <option value="viewer">viewer — ดูอย่างเดียว</option>
-                    <option value="editor">editor — แก้ไขได้</option>
-                    <option value="admin">admin — สิทธิ์เต็ม</option>
-                  </select>
-                </div>
-              </form>
-
-              <div>
-                <div className="field-label">สิทธิ์เข้าหน้า</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {APP_NAV_ITEMS.map((item) => (
-                    <span key={item.id} className={`chip !px-2.5 !py-1 !text-xs ${canAccessPage(role, item.id) ? 'chip-active' : 'opacity-40'}`}>
-                      {item.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="field-label">สถานี</div>
-                <div className="grid gap-2">
-                  {stations.map((station) => (
-                    <label key={station.id} className="inline-flex items-start gap-2 text-sm">
-                      <input
-                        form={`permission-mobile-${member.id}`}
-                        type="checkbox"
-                        name="station_ids"
-                        value={station.id}
-                        defaultChecked={role === 'admin' || access.has(station.id)}
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
-                      />
-                      <span className="leading-5">{STATION_LABEL[station.id as StationId] ?? station.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <button form={`permission-mobile-${member.id}`} type="submit" className="btn-primary w-full">
-                บันทึกสิทธิ์
-              </button>
-
-              <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-                <PasswordResetControl profileId={member.id} />
-                <ActiveToggleControl profileId={member.id} active={member.active} isSelf={member.id === currentUserId} />
-              </div>
-            </article>
-          );
-        })}
+        {filtered.map((member) => (
+          <MemberMobileCard
+            key={member.id}
+            member={member}
+            stations={stations}
+            access={new Set(accessByProfile[member.id] ?? [])}
+            currentUserId={currentUserId}
+          />
+        ))}
       </div>
 
       <div className="table-shell hidden lg:block">
@@ -228,73 +351,15 @@ export function MembersTable({
                 </td>
               </tr>
             )}
-            {filtered.map((member) => {
-              const role = normalizeRole(member.role);
-              const access = new Set(accessByProfile[member.id] ?? []);
-
-              return (
-                <tr key={member.id} className="border-b border-slate-200 last:border-0 align-top hover:bg-slate-50">
-                  <td className="px-3.5 py-3 min-w-56">
-                    <div className="font-bold text-slate-950">{member.full_name || 'ยังไม่ระบุชื่อ'}</div>
-                    <div className="text-xs text-slate-600">{member.email || member.id}</div>
-                    <div className="mt-0.5 text-[11px] text-slate-400">เข้าระบบล่าสุด {formatDateTime(member.lastSignInAt)}</div>
-                  </td>
-                  <td className="px-3.5 py-3">
-                    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-bold ${member.active ? 'bg-brand-50 text-brand-700' : 'bg-red-50 text-red-700'}`}>
-                      {member.active ? <ShieldCheck size={12} aria-hidden="true" /> : <Ban size={12} aria-hidden="true" />}
-                      {member.active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
-                    </span>
-                  </td>
-                  <td className="px-3.5 py-3">
-                    <form id={`permission-${member.id}`} action={updateUserPermissions} className="space-y-3">
-                      <input type="hidden" name="profile_id" value={member.id} />
-                      <select name="role" defaultValue={role} className="field min-w-28">
-                        <option value="viewer">viewer</option>
-                        <option value="editor">editor</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    </form>
-                  </td>
-                  <td className="px-3.5 py-3 min-w-52">
-                    <div className="flex flex-wrap gap-1.5">
-                      {APP_NAV_ITEMS.map((item) => (
-                        <span key={item.id} className={`chip !px-2.5 !py-1 !text-xs ${canAccessPage(role, item.id) ? 'chip-active' : 'opacity-40'}`}>
-                          {item.label}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-3.5 py-3 min-w-64">
-                    <div className="grid gap-2">
-                      {stations.map((station) => (
-                        <label key={station.id} className="inline-flex items-center gap-2 text-sm">
-                          <input
-                            form={`permission-${member.id}`}
-                            type="checkbox"
-                            name="station_ids"
-                            value={station.id}
-                            defaultChecked={role === 'admin' || access.has(station.id)}
-                            className="h-4 w-4 accent-brand-600"
-                          />
-                          <span>{STATION_LABEL[station.id as StationId] ?? station.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-3.5 py-3 min-w-40">
-                    <div className="flex flex-col items-start gap-2">
-                      <PasswordResetControl profileId={member.id} />
-                      <ActiveToggleControl profileId={member.id} active={member.active} isSelf={member.id === currentUserId} />
-                    </div>
-                  </td>
-                  <td className="px-3.5 py-3 text-right">
-                    <button form={`permission-${member.id}`} type="submit" className="btn-primary whitespace-nowrap">
-                      บันทึกสิทธิ์
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+            {filtered.map((member) => (
+              <MemberTableRow
+                key={member.id}
+                member={member}
+                stations={stations}
+                access={new Set(accessByProfile[member.id] ?? [])}
+                currentUserId={currentUserId}
+              />
+            ))}
           </tbody>
         </table>
       </div>

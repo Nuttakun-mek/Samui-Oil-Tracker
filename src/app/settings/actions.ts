@@ -71,7 +71,7 @@ export async function updateStationSettings(formData: FormData) {
     !Number.isFinite(low_stock_days) || low_stock_days < 0 ||
     !Number.isFinite(fuel_price_per_liter) || fuel_price_per_liter < 0
   ) {
-    throw new Error('ค่าตั้งค่าสถานีต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป');
+    return { ok: false as const, error: 'ค่าตั้งค่าสถานีต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' };
   }
 
   const supabase = await createClient();
@@ -81,11 +81,12 @@ export async function updateStationSettings(formData: FormData) {
     .update({ tank_capacity_liters, low_stock_days, fuel_price_per_liter })
     .eq('id', id);
 
-  if (error) throw new Error(error.message);
+  if (error) return { ok: false as const, error: error.message };
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');
   revalidatePath('/reports');
+  return { ok: true as const };
 }
 
 export async function resetOperationalData() {
@@ -183,7 +184,9 @@ export async function updateUserPermissions(formData: FormData) {
     .map(String)
     .filter((stationId): stationId is StationId => STATION_IDS.includes(stationId as StationId));
 
-  if (!profileId || !['admin', 'editor', 'viewer'].includes(role)) return;
+  if (!profileId || !['admin', 'editor', 'viewer'].includes(role)) {
+    return { ok: false as const, error: 'ข้อมูลไม่ถูกต้อง' };
+  }
 
   const supabase = await createClient();
   const {
@@ -191,19 +194,22 @@ export async function updateUserPermissions(formData: FormData) {
   } = await supabase.auth.getUser();
 
   if (user?.id === profileId && role !== 'admin') {
-    return;
+    return { ok: false as const, error: 'ไม่สามารถลดสิทธิ์ตัวเองจาก admin ได้' };
   }
 
-  await supabase.rpc('admin_update_user_permissions', {
+  const { error } = await supabase.rpc('admin_update_user_permissions', {
     target_profile_id: profileId,
     target_role: role,
     target_station_ids: stationIds,
   });
 
+  if (error) return { ok: false as const, error: error.message };
+
   revalidatePath('/settings');
   revalidatePath('/dashboard');
   revalidatePath('/entry');
   revalidatePath('/history');
+  return { ok: true as const };
 }
 
 export async function createMember(formData: FormData) {
