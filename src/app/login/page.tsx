@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Building2, LockKeyhole, Phone, ShieldCheck } from 'lucide-react';
+import { Building2, Loader2, LockKeyhole, Phone, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { APP_RELEASE } from '@/lib/app-version';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -30,6 +30,12 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {loading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-white/85 backdrop-blur-sm" role="status" aria-live="polite">
+          <Loader2 size={36} className="animate-spin text-brand-700" aria-hidden="true" />
+          <p className="text-sm font-extrabold text-brand-900">กำลังเข้าสู่ระบบ กรุณารอสักครู่...</p>
+        </div>
+      )}
       <div className="grid min-h-screen lg:grid-cols-[minmax(340px,0.8fr)_minmax(520px,1.2fr)]">
         <section className="relative flex min-h-64 flex-col justify-between overflow-hidden bg-brand-700 px-6 py-8 text-white sm:px-10 lg:min-h-screen lg:px-12 lg:py-12">
           <div className="absolute inset-x-0 top-0 h-1.5 bg-gold-500" />

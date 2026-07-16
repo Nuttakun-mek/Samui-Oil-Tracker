@@ -1,6 +1,7 @@
 import { FileText } from 'lucide-react';
 import { getCurrentUserAccess, requirePageAccess } from '@/lib/auth/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { formatThaiDate } from '@/lib/format/thai-date';
 import { STATION_IDS, STATION_LABEL, type FuelRecord, type Station, type StationId } from '@/lib/types/domain';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
@@ -25,14 +26,25 @@ function recordSourceLabel(source: FuelRecord['record_source']) {
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePageAccess('reports');
-  const access = await getCurrentUserAccess();
-  const supabase = await createClient();
   const params = await searchParams;
+
+  // รายงาน (ภาพรวม) ให้ทุกบัญชีเห็นทุกพื้นที่โดยเจตนา เช่นเดียวกับหน้าแดชบอร์ด —
+  // อ่านผ่าน admin client เพื่อข้าม RLS เฉพาะหน้านี้ (fallback ตามสิทธิ์ถ้าไม่มี service key)
+  let supabase: ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>;
+  let visibleStationIds: StationId[];
+  try {
+    supabase = createAdminClient();
+    visibleStationIds = [...STATION_IDS];
+  } catch {
+    const access = await getCurrentUserAccess();
+    supabase = await createClient();
+    visibleStationIds = access.stationIds;
+  }
 
   const { data: latest } = await supabase
     .from('fuel_records')
     .select('record_date')
-    .in('station_id', access.stationIds)
+    .in('station_id', visibleStationIds)
     .order('record_date', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -41,11 +53,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const from = asDate(params.from) ?? defaultFrom;
   const to = asDate(params.to) ?? latestDate;
   const requestedStation = Array.isArray(params.station) ? params.station[0] : params.station;
-  const selectedStation = requestedStation && access.stationIds.includes(requestedStation as StationId) ? requestedStation : 'all';
-  const selectedStationIds = selectedStation === 'all' ? access.stationIds : [selectedStation];
+  const selectedStation = requestedStation && visibleStationIds.includes(requestedStation as StationId) ? requestedStation : 'all';
+  const selectedStationIds = selectedStation === 'all' ? visibleStationIds : [selectedStation as StationId];
 
   const [{ data: stations }, { data: records }] = await Promise.all([
-    supabase.from('stations').select('*').in('id', access.stationIds).order('name'),
+    supabase.from('stations').select('*').in('id', visibleStationIds).order('name'),
     supabase
       .from('fuel_records')
       .select('*')

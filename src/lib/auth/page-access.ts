@@ -2,7 +2,7 @@ export type UserRole = 'admin' | 'editor' | 'viewer';
 export type AppPageId = 'dashboard' | 'entry' | 'history' | 'reports' | 'settings';
 
 export const APP_NAV_ITEMS: Array<{ id: AppPageId; href: `/${AppPageId}`; label: string }> = [
-  { id: 'dashboard', href: '/dashboard', label: 'แดชบอร์ด' },
+  { id: 'dashboard', href: '/dashboard', label: 'ภาพรวมน้ำมัน' },
   { id: 'entry', href: '/entry', label: 'บันทึกการใช้น้ำมัน' },
   { id: 'history', href: '/history', label: 'ประวัติข้อมูล' },
   { id: 'reports', href: '/reports', label: 'รายงาน' },

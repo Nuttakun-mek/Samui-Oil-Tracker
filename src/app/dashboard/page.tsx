@@ -102,7 +102,7 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="page-kicker">Dashboard</div>
-          <h1 className="page-title">ภาพรวมสต๊อกน้ำมัน</h1>
+          <h1 className="page-title">ภาพรวมน้ำมัน</h1>
           <p className="page-subtitle">สถานะคงเหลือปัจจุบัน แนวโน้ม และสัญญาณเฝ้าระวังของทั้ง 3 พื้นที่เกาะ</p>
         </div>
         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">

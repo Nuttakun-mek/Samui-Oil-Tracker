@@ -1,15 +1,17 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import { CheckCircle2, PlusCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { CheckCircle2, PlusCircle, Trash2 } from 'lucide-react';
 import type { ProcurementGroupSummary, ProcurementSummary } from '@/lib/procurement';
-import { setGroupBaseline, addProcurementLot, uploadContractDocument } from './procurement-actions';
+import { setGroupBaseline, addProcurementLot, deleteProcurementLot, uploadContractDocument } from './procurement-actions';
 import { ContractDocuments } from './contract-documents';
 
 function useFormSubmit(action: (formData: FormData) => Promise<{ ok: boolean; error?: string }>) {
   const [message, setMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const submit = (formData: FormData, onSuccess?: () => void) => {
     setMessage(null);
@@ -19,6 +21,7 @@ function useFormSubmit(action: (formData: FormData) => Promise<{ ok: boolean; er
       setMessage(result.ok ? 'บันทึกแล้ว' : (result.error ?? 'เกิดข้อผิดพลาด'));
       if (result.ok) {
         onSuccess?.();
+        router.refresh();
         setTimeout(() => setMessage(null), 3000);
       }
     });
@@ -43,6 +46,7 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
   const [lotSuccess, setLotSuccess] = useState(false);
   const [isLotPending, startLotTransition] = useTransition();
   const lotFileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const onLotSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -67,7 +71,21 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
       setLotSuccess(true);
       setLotMessage(message);
       form.reset();
+      router.refresh();
       setTimeout(() => setLotMessage(null), 4000);
+    });
+  };
+
+  const onDeleteLot = (lotId: string, label: string) => {
+    if (!window.confirm(`ลบล๊อต "${label}" ออกจากประวัติ? ยอดคงเหลือของกลุ่มจะถูกคำนวณใหม่ทันที`)) return;
+    startLotTransition(async () => {
+      const result = await deleteProcurementLot(lotId);
+      setLotSuccess(result.ok);
+      setLotMessage(result.ok ? 'ลบล๊อตแล้ว' : (result.error ?? 'ลบไม่สำเร็จ'));
+      if (result.ok) {
+        router.refresh();
+        setTimeout(() => setLotMessage(null), 3000);
+      }
     });
   };
 
@@ -232,7 +250,19 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
                     {new Date(lot.addedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' })}
                   </td>
                   <td className="px-3 py-2">
-                    <ContractDocuments contractId={lot.id} count={lot.documentsCount} canEdit />
+                    <div className="flex items-center gap-1.5">
+                      <ContractDocuments contractId={lot.id} count={lot.documentsCount} canEdit />
+                      <button
+                        type="button"
+                        onClick={() => onDeleteLot(lot.id, lot.contractCode)}
+                        disabled={isLotPending}
+                        className="rounded-md border border-red-200 bg-white p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-40"
+                        title="ลบล๊อตนี้ (กรณีกรอกผิด)"
+                        aria-label={`ลบล๊อต ${lot.contractCode}`}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

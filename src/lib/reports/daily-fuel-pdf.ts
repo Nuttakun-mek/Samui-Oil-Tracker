@@ -86,7 +86,7 @@ function buildInsightBullets(stations: Station[], insights: StationInsight[], an
 }
 
 function drawExecutiveSummary(doc: InstanceType<typeof PDFDocument>, stations: Station[], records: FuelRecord[], from: string, to: string) {
-  doc.fillColor('#0f172a').fontSize(18).text('รายงานสรุปสำหรับผู้บริหาร', MARGIN, MARGIN);
+  doc.fillColor('#0f172a').fontSize(18).text('รายงานสรุปภาพรวมการใช้น้ำมัน', MARGIN, MARGIN);
   const scopeLabel = stations.length === 1 ? STATION_LABEL[stations[0].id] : 'ทุกพื้นที่';
   doc.fontSize(10).fillColor('#475569').text(`${formatThaiDate(from)} ถึง ${formatThaiDate(to)}  ·  ขอบเขต: ${scopeLabel}`, MARGIN, MARGIN + 24);
 

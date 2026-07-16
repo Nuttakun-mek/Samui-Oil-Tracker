@@ -4,7 +4,8 @@ import path from 'node:path';
 import { getCurrentUserAccess } from '@/lib/auth/server';
 import { createDailyFuelPdf } from '@/lib/reports/daily-fuel-pdf';
 import { createClient } from '@/lib/supabase/server';
-import type { FuelRecord, Station, StationId } from '@/lib/types/domain';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { STATION_IDS, type FuelRecord, type Station, type StationId } from '@/lib/types/domain';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,12 +19,23 @@ export async function GET(request: NextRequest) {
   const to = validDate(request.nextUrl.searchParams.get('to'));
   if (!from || !to || from > to) return new Response('Invalid date range', { status: 400 });
 
+  // ยังต้องล็อกอินอยู่จึงจะดาวน์โหลดได้ (redirect ไป /login ถ้าไม่มี session)
   const access = await getCurrentUserAccess();
+
+  // รายงาน (ภาพรวม) ให้ทุกบัญชีเห็นทุกพื้นที่ เช่นเดียวกับหน้ารายงาน/แดชบอร์ด
+  let supabase: ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>;
+  let visibleStationIds: StationId[];
+  try {
+    supabase = createAdminClient();
+    visibleStationIds = [...STATION_IDS];
+  } catch {
+    supabase = await createClient();
+    visibleStationIds = access.stationIds;
+  }
   const requestedStation = request.nextUrl.searchParams.get('station');
-  const stationIds = requestedStation && access.stationIds.includes(requestedStation as StationId)
+  const stationIds = requestedStation && visibleStationIds.includes(requestedStation as StationId)
     ? [requestedStation as StationId]
-    : access.stationIds;
-  const supabase = await createClient();
+    : visibleStationIds;
   const [{ data: stations }, { data: records, error }] = await Promise.all([
     supabase.from('stations').select('*').in('id', stationIds).order('name'),
     supabase.from('fuel_records').select('*').in('station_id', stationIds).gte('record_date', from).lte('record_date', to).order('record_date').order('station_id'),

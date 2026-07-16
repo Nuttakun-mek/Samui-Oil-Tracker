@@ -117,6 +117,38 @@ export async function addProcurementLot(formData: FormData) {
   return { ok: true as const, contractId: inserted.id as string };
 }
 
+export async function deleteProcurementLot(contractId: string) {
+  await requireAdmin();
+
+  const supabase = await createClient();
+  // ลบเฉพาะแถวที่ผูกกลุ่มผ่านระบบนี้เท่านั้น — สัญญาเก่า (procurement_group = null) แตะไม่ได้
+  const { data: lot } = await supabase
+    .from('fuel_contracts')
+    .select('id, procurement_group')
+    .eq('id', contractId)
+    .not('procurement_group', 'is', null)
+    .maybeSingle();
+  if (!lot) return { ok: false as const, error: 'ไม่พบล๊อตที่ต้องการลบ' };
+
+  // ลบไฟล์เอกสารแนบใน storage ก่อน — FK cascade ลบได้เฉพาะแถว metadata ไม่ลบไฟล์จริง
+  const { data: documents } = await supabase.from('fuel_contract_documents').select('file_path').eq('contract_id', contractId);
+  if (documents?.length) {
+    try {
+      const admin = createAdminClient();
+      await admin.storage.from(DOCUMENTS_BUCKET).remove(documents.map((doc) => doc.file_path as string));
+    } catch {
+      // ไม่มี service key: ยอมให้ไฟล์ค้างใน storage ดีกว่า block การลบล๊อต
+    }
+  }
+
+  const { error } = await supabase.from('fuel_contracts').delete().eq('id', contractId);
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath('/dashboard');
+  revalidatePath('/settings');
+  return { ok: true as const };
+}
+
 export async function uploadContractDocument(contractId: string, formData: FormData) {
   await requireAdmin();
 
