@@ -205,7 +205,7 @@ export default async function HistoryPage({
                 <div className="mt-1 text-xs font-semibold text-slate-500">ผู้รายงาน {reporterText(r, profileMap)}</div>
               </div>
               <div className="flex shrink-0 gap-2">
-                <EditRecordButton record={r} allowedStationIds={access.stationIds} />
+                {role !== 'viewer' && <EditRecordButton record={r} allowedStationIds={access.stationIds} />}
                 {role === 'admin' && <DeleteButton id={r.id} />}
               </div>
             </div>
@@ -296,7 +296,7 @@ export default async function HistoryPage({
                 </td>
                 <td className="px-3.5 py-2.5">
                   <div className="flex justify-end gap-2">
-                    <EditRecordButton record={r} allowedStationIds={access.stationIds} />
+                    {role !== 'viewer' && <EditRecordButton record={r} allowedStationIds={access.stationIds} />}
                     {role === 'admin' && <DeleteButton id={r.id} />}
                   </div>
                 </td>

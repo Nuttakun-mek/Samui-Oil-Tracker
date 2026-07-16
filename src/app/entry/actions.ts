@@ -14,6 +14,9 @@ export async function upsertFuelRecord(raw: FuelRecordFormValues) {
   }
   const values = parsed.data;
   const access = await getCurrentUserAccess();
+  if (access.role === 'viewer') {
+    return { ok: false as const, error: 'บัญชีนี้มีสิทธิ์ดูอย่างเดียว ไม่สามารถบันทึกข้อมูลได้' };
+  }
   if (!access.stationIds.includes(values.station_id)) {
     return { ok: false as const, error: 'บัญชีนี้ไม่มีสิทธิ์บันทึกข้อมูลของพื้นที่ที่เลือก' };
   }
@@ -94,6 +97,9 @@ export async function updateFuelRecord(id: string, raw: FuelRecordFormValues) {
   }
   const values = parsed.data;
   const access = await getCurrentUserAccess();
+  if (access.role === 'viewer') {
+    return { ok: false as const, error: 'บัญชีนี้มีสิทธิ์ดูอย่างเดียว ไม่สามารถแก้ไขข้อมูลได้' };
+  }
   if (!access.stationIds.includes(values.station_id)) {
     return { ok: false as const, error: 'บัญชีนี้ไม่มีสิทธิ์แก้ไขข้อมูลของพื้นที่ที่เลือก' };
   }

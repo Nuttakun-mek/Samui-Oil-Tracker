@@ -288,7 +288,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
           <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h3 className="text-base font-extrabold text-slate-950">แนวโน้ม {selectedStationLabel}</h3>
-              <p className="text-xs text-slate-500">ม่วง: รับเข้า · ทอง: ใช้ออก · เส้นม่วงเข้ม: คงเหลือปลายช่วง</p>
+              <p className="text-xs text-slate-500">ฟ้า: รับเข้า · เขียว: ใช้ออก · เส้นเหลืองทอง: คงเหลือปลายช่วง (หน่วย: ลิตร)</p>
             </div>
             <span className="text-xs font-semibold text-slate-500">{periodLabel}</span>
           </div>
@@ -298,12 +298,17 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
                 <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
                   <CartesianGrid stroke="#E2E8F0" vertical={false} />
                   <XAxis dataKey="period" tick={{ fontSize: 11, fill: '#64748B' }} minTickGap={periodMode === 'daily' ? 28 : 12} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(value) => Number(value).toLocaleString('th-TH')} width={72} />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#64748B' }}
+                    tickFormatter={(value) => Number(value).toLocaleString('th-TH')}
+                    width={72}
+                    label={{ value: 'ลิตร', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#64748B', textAnchor: 'middle' } }}
+                  />
                   <Tooltip formatter={(value: number, name) => [`${Number(value).toLocaleString('th-TH')} ลิตร`, name]} labelFormatter={(label) => `ช่วง ${label}`} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="received" name="รับเข้า" fill="#722257" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="dispatched" name="ใช้ออก" fill="#C69214" radius={[3, 3, 0, 0]} />
-                  <Line type="monotone" dataKey="closing" name="คงเหลือ" stroke="#310923" strokeWidth={3} dot={false} />
+                  <Bar dataKey="received" name="รับเข้า (ลิตร)" fill="#2a78d6" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="dispatched" name="ใช้ออก (ลิตร)" fill="#1baf7a" radius={[3, 3, 0, 0]} />
+                  <Line type="monotone" dataKey="closing" name="คงเหลือ (ลิตร)" stroke="#eda100" strokeWidth={3} dot={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

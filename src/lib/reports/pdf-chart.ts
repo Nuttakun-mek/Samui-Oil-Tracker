@@ -10,9 +10,9 @@ interface ChartArea {
   height: number;
 }
 
-const COLOR_RECEIVED = '#722257';
-const COLOR_DISPATCHED = '#C69214';
-const COLOR_CLOSING = '#310923';
+const COLOR_RECEIVED = '#2a78d6';
+const COLOR_DISPATCHED = '#1baf7a';
+const COLOR_CLOSING = '#eda100';
 const COLOR_GRID = '#E2E8F0';
 const COLOR_AXIS = '#64748B';
 
@@ -22,16 +22,17 @@ export function drawTrendChart(doc: Doc, area: ChartArea, buckets: TrendBucket[]
   const { x, y, width, height } = area;
 
   const legendItems = [
-    { color: COLOR_RECEIVED, label: 'รับเข้า' },
-    { color: COLOR_DISPATCHED, label: 'ใช้ออก' },
-    { color: COLOR_CLOSING, label: 'คงเหลือ' },
+    { color: COLOR_RECEIVED, label: 'รับเข้า (ลิตร)' },
+    { color: COLOR_DISPATCHED, label: 'ใช้ออก (ลิตร)' },
+    { color: COLOR_CLOSING, label: 'คงเหลือ (ลิตร)' },
   ];
   const axisLabelWidth = 48;
+  doc.fontSize(6.5).fillColor(COLOR_AXIS).text('ลิตร', x, y + 1, { width: axisLabelWidth - 6, align: 'left' });
   let legendX = x + axisLabelWidth;
   legendItems.forEach((item) => {
     doc.rect(legendX, y + 2, 7, 7).fill(item.color);
-    doc.fontSize(7).fillColor('#334155').text(item.label, legendX + 10, y + 1);
-    legendX += 58;
+    doc.fontSize(7).fillColor('#334155').text(item.label, legendX + 10, y + 1, { lineBreak: false });
+    legendX += 78;
   });
 
   if (!buckets.length) {

@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import { STATION_IDS, STATION_LABEL, type StationId } from '@/lib/types/domain';
+import type { UserRole } from '@/lib/auth/page-access';
 import { createMember } from './actions';
 
 export function AddMemberForm() {
   const [message, setMessage] = useState<string | null>(null);
-  const [role, setRole] = useState<'admin' | 'field'>('field');
+  const [role, setRole] = useState<UserRole>('viewer');
   const [isPending, startTransition] = useTransition();
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -19,7 +20,7 @@ export function AddMemberForm() {
       if (result.ok) {
         setMessage(`สร้างสมาชิก ${result.email} เรียบร้อย`);
         form.reset();
-        setRole('field');
+        setRole('viewer');
       } else {
         setMessage(result.error);
       }
@@ -49,9 +50,10 @@ export function AddMemberForm() {
           </div>
           <div>
             <label className="field-label">Role</label>
-            <select name="role" value={role} onChange={(event) => setRole(event.target.value as 'admin' | 'field')} className="field">
-              <option value="field">field</option>
-              <option value="admin">admin</option>
+            <select name="role" value={role} onChange={(event) => setRole(event.target.value as UserRole)} className="field">
+              <option value="viewer">viewer — ดูและส่งออกได้อย่างเดียว</option>
+              <option value="editor">editor — แก้ไข/บันทึกข้อมูลได้</option>
+              <option value="admin">admin — สิทธิ์เต็ม</option>
             </select>
           </div>
         </div>

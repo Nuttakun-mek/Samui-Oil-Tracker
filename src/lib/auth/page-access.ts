@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'field';
+export type UserRole = 'admin' | 'editor' | 'viewer';
 export type AppPageId = 'dashboard' | 'entry' | 'history' | 'reports' | 'settings';
 
 export const APP_NAV_ITEMS: Array<{ id: AppPageId; href: `/${AppPageId}`; label: string }> = [
@@ -11,11 +11,14 @@ export const APP_NAV_ITEMS: Array<{ id: AppPageId; href: `/${AppPageId}`; label:
 
 const ROLE_PAGE_ACCESS: Record<UserRole, AppPageId[]> = {
   admin: ['dashboard', 'entry', 'history', 'reports', 'settings'],
-  field: ['dashboard', 'entry', 'history', 'reports'],
+  editor: ['dashboard', 'entry', 'history', 'reports'],
+  viewer: ['dashboard', 'history', 'reports'],
 };
 
 export function normalizeRole(role: string | null | undefined): UserRole {
-  return role === 'admin' ? 'admin' : 'field';
+  if (role === 'admin') return 'admin';
+  if (role === 'editor' || role === 'field') return 'editor';
+  return 'viewer';
 }
 
 export function canAccessPage(role: UserRole, page: AppPageId) {

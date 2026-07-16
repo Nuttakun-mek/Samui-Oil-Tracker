@@ -177,13 +177,13 @@ export async function updateUserPermissions(formData: FormData) {
   await requireAdmin();
 
   const profileId = String(formData.get('profile_id') ?? '');
-  const role = String(formData.get('role') ?? 'field');
+  const role = String(formData.get('role') ?? 'viewer');
   const stationIds = formData
     .getAll('station_ids')
     .map(String)
     .filter((stationId): stationId is StationId => STATION_IDS.includes(stationId as StationId));
 
-  if (!profileId || !['admin', 'field'].includes(role)) return;
+  if (!profileId || !['admin', 'editor', 'viewer'].includes(role)) return;
 
   const supabase = await createClient();
   const {
@@ -212,7 +212,7 @@ export async function createMember(formData: FormData) {
   const fullName = String(formData.get('full_name') ?? '').trim();
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
   const password = String(formData.get('password') ?? '');
-  const role = String(formData.get('role') ?? 'field');
+  const role = String(formData.get('role') ?? 'viewer');
   const stationIds = formData
     .getAll('station_ids')
     .map(String)
@@ -224,11 +224,11 @@ export async function createMember(formData: FormData) {
   if (password.length < 8) {
     return { ok: false as const, error: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' };
   }
-  if (!['admin', 'field'].includes(role)) {
+  if (!['admin', 'editor', 'viewer'].includes(role)) {
     return { ok: false as const, error: 'role ไม่ถูกต้อง' };
   }
-  if (role === 'field' && stationIds.length === 0) {
-    return { ok: false as const, error: 'กรุณาเลือกสถานีอย่างน้อย 1 แห่งสำหรับ field' };
+  if (role !== 'admin' && stationIds.length === 0) {
+    return { ok: false as const, error: 'กรุณาเลือกสถานีอย่างน้อย 1 แห่ง' };
   }
 
   let admin;

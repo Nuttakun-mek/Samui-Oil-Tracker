@@ -157,8 +157,9 @@ export function MembersTable({
                 <div>
                   <label className="field-label">Role</label>
                   <select name="role" defaultValue={role} className="field">
-                    <option value="field">field</option>
-                    <option value="admin">admin</option>
+                    <option value="viewer">viewer — ดูอย่างเดียว</option>
+                    <option value="editor">editor — แก้ไขได้</option>
+                    <option value="admin">admin — สิทธิ์เต็ม</option>
                   </select>
                 </div>
               </form>
@@ -248,7 +249,8 @@ export function MembersTable({
                     <form id={`permission-${member.id}`} action={updateUserPermissions} className="space-y-3">
                       <input type="hidden" name="profile_id" value={member.id} />
                       <select name="role" defaultValue={role} className="field min-w-28">
-                        <option value="field">field</option>
+                        <option value="viewer">viewer</option>
+                        <option value="editor">editor</option>
                         <option value="admin">admin</option>
                       </select>
                     </form>

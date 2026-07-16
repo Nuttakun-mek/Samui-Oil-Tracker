@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { STATION_LABEL, type Station } from '@/lib/types/domain';
@@ -13,8 +14,21 @@ import { MembersTable, type MemberRow } from './members-table';
 
 export const revalidate = 0;
 
-export default async function SettingsPage() {
+type SettingsTab = 'stations' | 'reset' | 'import-excel' | 'import-db' | 'members' | 'audit';
+const TABS: Array<{ id: SettingsTab; label: string }> = [
+  { id: 'stations', label: 'สถานี' },
+  { id: 'reset', label: 'ล้างข้อมูล' },
+  { id: 'import-excel', label: 'นำเข้า Excel' },
+  { id: 'import-db', label: 'นำเข้าฐานข้อมูล' },
+  { id: 'members', label: 'สมาชิกและสิทธิ์' },
+  { id: 'audit', label: 'ประวัติการเปลี่ยนสิทธิ์' },
+];
+
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   await requirePageAccess('settings');
+
+  const { tab: rawTab } = await searchParams;
+  const tab: SettingsTab = TABS.some((item) => item.id === rawTab) ? (rawTab as SettingsTab) : 'stations';
 
   const supabase = await createClient();
   const [{ data: stations }, { data: profiles }, { data: stationAccess }, countEntries] = await Promise.all([
@@ -129,12 +143,15 @@ export default async function SettingsPage() {
           className="sticky top-[68px] z-30 -mx-4 flex gap-1 overflow-x-auto border-y border-slate-200 bg-[#F7F7F9]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 md:top-[113px]"
           aria-label="หมวดการตั้งค่า"
         >
-          <a href="#station-settings" className="chip whitespace-nowrap">สถานี</a>
-          <a href="#data-reset" className="chip whitespace-nowrap">ล้างข้อมูล</a>
-          <a href="#spreadsheet-import" className="chip whitespace-nowrap">นำเข้า Excel</a>
-          <a href="#database-import" className="chip whitespace-nowrap">นำเข้าฐานข้อมูล</a>
-          <a href="#members" className="chip whitespace-nowrap">สมาชิกและสิทธิ์</a>
-          <a href="#audit" className="chip whitespace-nowrap">ประวัติการเปลี่ยนสิทธิ์</a>
+          {TABS.map((item) => (
+            <Link
+              key={item.id}
+              href={`/settings?tab=${item.id}`}
+              className={`chip whitespace-nowrap ${tab === item.id ? 'chip-active' : ''}`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
       )}
 
@@ -144,7 +161,8 @@ export default async function SettingsPage() {
         </div>
       )}
 
-      <section id="station-settings" className="scroll-mt-32 space-y-3">
+      {tab === 'stations' && (
+      <section className="space-y-3">
         <div>
           <h2 className="text-lg font-extrabold text-slate-950">ตั้งค่าสถานี</h2>
           <p className="text-sm text-slate-600">กำหนดความจุถัง เกณฑ์เฝ้าระวัง และราคาต่อลิตรสำหรับประมาณการงบประมาณ</p>
@@ -196,25 +214,26 @@ export default async function SettingsPage() {
           ))}
         </div>
       </section>
+      )}
 
-      {isAdmin && (
+      {isAdmin && tab === 'reset' && (
         <ResetDataPanel initialCounts={operationalCounts} />
       )}
 
-      {isAdmin && (
-        <div id="spreadsheet-import" className="scroll-mt-32">
+      {isAdmin && tab === 'import-excel' && (
+        <div>
           <ImportRecordsPanel />
         </div>
       )}
 
-      {isAdmin && (
-        <div id="database-import" className="scroll-mt-32">
+      {isAdmin && tab === 'import-db' && (
+        <div>
           <DatabaseExportImportPanel />
         </div>
       )}
 
-      {isAdmin && (
-        <div id="members" className="scroll-mt-32 space-y-5">
+      {isAdmin && tab === 'members' && (
+        <div className="space-y-5">
           <AddMemberForm />
 
           <section className="space-y-3">
@@ -227,8 +246,8 @@ export default async function SettingsPage() {
         </div>
       )}
 
-      {isAdmin && (
-        <section id="audit" className="scroll-mt-32 space-y-3">
+      {isAdmin && tab === 'audit' && (
+        <section className="space-y-3">
           <div>
             <h2 className="text-lg font-extrabold text-slate-950">ประวัติการเปลี่ยนสิทธิ์</h2>
             <p className="text-sm text-slate-600">บันทึกทุกครั้งที่มีการสร้างสมาชิกหรือเปลี่ยน role/สถานีที่เข้าถึงได้ — ตรวจสอบย้อนหลังได้ว่าใครแก้ไขอะไรเมื่อไหร่</p>
