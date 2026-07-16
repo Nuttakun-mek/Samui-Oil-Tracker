@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { CheckCircle2, PlusCircle } from 'lucide-react';
 import type { ProcurementGroupSummary, ProcurementSummary } from '@/lib/procurement';
-import { setGroupBaseline, addProcurementLot } from './procurement-actions';
+import { setGroupBaseline, addProcurementLot, uploadContractDocument } from './procurement-actions';
+import { ContractDocuments } from './contract-documents';
 
 function useFormSubmit(action: (formData: FormData) => Promise<{ ok: boolean; error?: string }>) {
   const [message, setMessage] = useState<string | null>(null);
@@ -38,7 +39,37 @@ function FormFeedback({ message, isSuccess }: { message: string | null; isSucces
 
 function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
   const baselineForm = useFormSubmit(setGroupBaseline);
-  const lotForm = useFormSubmit(addProcurementLot);
+  const [lotMessage, setLotMessage] = useState<string | null>(null);
+  const [lotSuccess, setLotSuccess] = useState(false);
+  const [isLotPending, startLotTransition] = useTransition();
+  const lotFileInputRef = useRef<HTMLInputElement>(null);
+
+  const onLotSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const file = lotFileInputRef.current?.files?.[0] ?? null;
+    setLotMessage(null);
+    startLotTransition(async () => {
+      const result = await addProcurementLot(formData);
+      if (!result.ok) {
+        setLotSuccess(false);
+        setLotMessage(result.error);
+        return;
+      }
+      let message = 'บันทึกแล้ว';
+      if (file) {
+        const fileForm = new FormData();
+        fileForm.append('file', file);
+        const uploadResult = await uploadContractDocument(result.contractId, fileForm);
+        if (!uploadResult.ok) message = `บันทึกล๊อตสำเร็จ แต่แนบเอกสารไม่สำเร็จ: ${uploadResult.error}`;
+      }
+      setLotSuccess(true);
+      setLotMessage(message);
+      form.reset();
+      setTimeout(() => setLotMessage(null), 4000);
+    });
+  };
 
   return (
     <div className="panel space-y-4">
@@ -117,14 +148,11 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
 
       <div className="rounded-lg border border-slate-200 px-3.5 py-3">
         <h4 className="text-sm font-bold text-slate-700">เพิ่มล๊อตใหม่</h4>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            const form = event.currentTarget;
-            lotForm.submit(new FormData(form), () => form.reset());
-          }}
-          className="mt-2 space-y-3"
-        >
+        <p className="mt-0.5 text-xs text-slate-500">
+          ใช้เมื่อซื้อล๊อตใหญ่เพิ่มจริง (มีเลขสัญญาใหม่) — ถ้าต้องการแค่ตั้งยอดคงเหลือปัจจุบันโดยไม่มีเลขสัญญา ให้ใช้ฟอร์ม
+          &ldquo;ตั้งยอดคงเหลือเริ่มต้น&rdquo; ด้านบนแทน
+        </p>
+        <form onSubmit={onLotSubmit} className="mt-2 space-y-3">
           <input type="hidden" name="procurement_group" value={group.id} />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
@@ -148,12 +176,21 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
             <label className="field-label">หมายเหตุ</label>
             <input name="note" type="text" className="field" />
           </div>
+          <div>
+            <label className="field-label">แนบเอกสารสัญญา (ถ้ามี)</label>
+            <input
+              ref={lotFileInputRef}
+              type="file"
+              accept="application/pdf,image/jpeg,image/png,image/webp"
+              className="field file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-brand-700"
+            />
+          </div>
           <div className="flex items-center gap-2.5">
-            <button type="submit" disabled={lotForm.isPending} className="btn-primary">
+            <button type="submit" disabled={isLotPending} className="btn-primary">
               <PlusCircle size={16} aria-hidden="true" />
-              {lotForm.isPending ? 'กำลังบันทึก...' : 'เพิ่มล๊อตนี้'}
+              {isLotPending ? 'กำลังบันทึก...' : 'เพิ่มล๊อตนี้'}
             </button>
-            <FormFeedback message={lotForm.message} isSuccess={lotForm.isSuccess} />
+            <FormFeedback message={lotMessage} isSuccess={lotSuccess} />
           </div>
         </form>
       </div>
@@ -171,12 +208,13 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
                 <th className="px-3 py-2 text-right">จำนวน (ลิตร)</th>
                 <th className="px-3 py-2 text-left">เพิ่มโดย</th>
                 <th className="px-3 py-2 text-left">เมื่อ</th>
+                <th className="px-3 py-2 text-left">เอกสาร</th>
               </tr>
             </thead>
             <tbody>
               {group.contracts.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
                     ยังไม่มีการเติมล๊อต
                   </td>
                 </tr>
@@ -192,6 +230,9 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
                   <td className="px-3 py-2">{lot.addedBy ?? '-'}</td>
                   <td className="px-3 py-2 whitespace-nowrap tabular-nums">
                     {new Date(lot.addedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </td>
+                  <td className="px-3 py-2">
+                    <ContractDocuments contractId={lot.id} count={lot.documentsCount} canEdit />
                   </td>
                 </tr>
               ))}

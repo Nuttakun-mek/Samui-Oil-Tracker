@@ -35,6 +35,7 @@ export interface ProcurementLot {
   note: string | null;
   addedBy: string | null;
   addedAt: string;
+  documentsCount: number;
 }
 
 export interface LegacyContract {
@@ -68,12 +69,18 @@ export interface ProcurementSummary {
 type Queryable = ReturnType<typeof createAdminClient> | Awaited<ReturnType<typeof createClient>>;
 
 async function fetchProcurementRows(supabase: Queryable) {
-  const [{ data: baselines }, { data: contracts }, { data: profiles }] = await Promise.all([
+  const [{ data: baselines }, { data: contracts }, { data: profiles }, { data: documentRows }] = await Promise.all([
     supabase.from('fuel_group_baseline').select('*'),
     supabase.from('fuel_contracts').select('*').order('contract_date', { ascending: false }),
     supabase.from('profiles').select('id, full_name'),
+    supabase.from('fuel_contract_documents').select('contract_id'),
   ]);
-  return { baselines: baselines ?? [], contracts: contracts ?? [], profiles: profiles ?? [] };
+  const documentCountByContract = new Map<string, number>();
+  for (const row of documentRows ?? []) {
+    const id = row.contract_id as string;
+    documentCountByContract.set(id, (documentCountByContract.get(id) ?? 0) + 1);
+  }
+  return { baselines: baselines ?? [], contracts: contracts ?? [], profiles: profiles ?? [], documentCountByContract };
 }
 
 // ยอดคงเหลือของกลุ่ม = ยอดตั้งต้น + สัญญาที่ผูกกลุ่มไว้ทั้งหมด − ยอดรับสะสมของสถานีในกลุ่มนับจากวันตั้งยอดเริ่มต้น
@@ -95,7 +102,7 @@ export async function getProcurementSummary(): Promise<ProcurementSummary> {
     supabase = await createClient();
   }
 
-  const { baselines, contracts, profiles } = await fetchProcurementRows(supabase);
+  const { baselines, contracts, profiles, documentCountByContract } = await fetchProcurementRows(supabase);
   const nameById = new Map(profiles.map((p: { id: string; full_name: string | null }) => [p.id, p.full_name]));
 
   const groups: ProcurementGroupSummary[] = await Promise.all(
@@ -131,6 +138,7 @@ export async function getProcurementSummary(): Promise<ProcurementSummary> {
           note: c.notes,
           addedBy: nameById.get(c.imported_by) ?? null,
           addedAt: c.imported_at,
+          documentsCount: documentCountByContract.get(c.id) ?? 0,
         })),
         contractsCount: groupContracts.length,
         contractsSum,

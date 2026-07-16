@@ -1,15 +1,15 @@
 'use server';
 
-import { randomUUID } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentUserAccess } from '@/lib/auth/server';
 import type { StationId } from '@/lib/types/domain';
+import { ALLOWED_DOCUMENT_MIME, DOCUMENTS_BUCKET, MAX_DOCUMENT_BYTES, safeStorageName } from '@/lib/documents';
 
-const BUCKET = 'fuel-documents';
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_MIME = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+const BUCKET = DOCUMENTS_BUCKET;
+const MAX_FILE_BYTES = MAX_DOCUMENT_BYTES;
+const ALLOWED_MIME = ALLOWED_DOCUMENT_MIME;
 
 export interface RecordDocument {
   id: string;
@@ -20,12 +20,6 @@ export interface RecordDocument {
   file_size_bytes: number;
   uploaded_by: string | null;
   uploaded_at: string;
-}
-
-// ทำชื่อไฟล์ให้ปลอดภัยสำหรับ storage key — เก็บชื่อเดิมไว้ใน metadata แยกต่างหาก
-function safeStorageName(fileName: string) {
-  const extension = fileName.includes('.') ? fileName.split('.').pop()!.toLowerCase().replace(/[^a-z0-9]/g, '') : 'bin';
-  return `${randomUUID()}.${extension}`;
 }
 
 export async function uploadRecordDocument(recordId: string, formData: FormData) {
