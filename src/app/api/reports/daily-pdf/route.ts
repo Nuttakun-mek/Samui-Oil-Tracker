@@ -28,15 +28,20 @@ export async function GET(request: NextRequest) {
   ]);
   if (error) return new Response(error.message, { status: 500 });
 
-  const fontResponse = await fetch(new URL('/fonts/Sarabun-Regular.ttf', request.nextUrl.origin), { cache: 'force-cache' });
-  if (!fontResponse.ok) return new Response('Unable to load PDF font', { status: 500 });
-  const thaiFont = Buffer.from(await fontResponse.arrayBuffer());
-  const pdf = await createDailyFuelPdf((stations ?? []) as Station[], (records ?? []) as FuelRecord[], from, to, thaiFont);
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="oil-daily-report-${from}-to-${to}.pdf"`,
-      'Cache-Control': 'no-store',
-    },
-  });
+  try {
+    const fontResponse = await fetch(new URL('/fonts/Sarabun-Regular.ttf', request.nextUrl.origin), { cache: 'force-cache' });
+    if (!fontResponse.ok) return new Response('Unable to load PDF font', { status: 500 });
+    const thaiFont = Buffer.from(await fontResponse.arrayBuffer());
+    const pdf = await createDailyFuelPdf((stations ?? []) as Station[], (records ?? []) as FuelRecord[], from, to, thaiFont);
+    return new Response(new Uint8Array(pdf), {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="oil-daily-report-${from}-to-${to}.pdf"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  } catch (pdfError) {
+    console.error('Daily PDF generation failed', pdfError);
+    return new Response('Unable to generate PDF report', { status: 500 });
+  }
 }
