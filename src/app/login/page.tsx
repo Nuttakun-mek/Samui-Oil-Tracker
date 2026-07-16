@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Building2, LockKeyhole, Phone, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { APP_RELEASE } from '@/lib/app-version';
+import { PasswordInput } from '@/components/ui/password-input';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -37,7 +38,7 @@ export default function LoginPage() {
             <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/20 bg-white/10">
               <Building2 size={24} aria-hidden="true" />
             </div>
-            <h1 className="mt-8 max-w-md text-3xl font-extrabold leading-tight sm:text-4xl">
+            <h1 className="mt-8 max-w-md text-3xl font-extrabold leading-snug sm:text-4xl">
               ระบบติดตามการใช้เชื้อเพลิงในพื้นที่เกาะสมุย เกาะพะงัน และเกาะเต่า
             </h1>
             <p className="mt-3 text-xs font-extrabold tracking-wide text-gold-200">Island Oil Tracker</p>
@@ -78,14 +79,12 @@ export default function LoginPage() {
               </div>
               <div>
                 <label className="field-label" htmlFor="login-password">รหัสผ่าน</label>
-                <input
+                <PasswordInput
                   id="login-password"
-                  type="password"
                   autoComplete="current-password"
                   required
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  className="field"
                 />
               </div>
               {error && (

@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { Ban, CheckCircle2, KeyRound, Search, ShieldCheck } from 'lucide-react';
 import { STATION_LABEL, type Station, type StationId } from '@/lib/types/domain';
 import { APP_NAV_ITEMS, canAccessPage, normalizeRole, type UserRole } from '@/lib/auth/page-access';
+import { PasswordInput } from '@/components/ui/password-input';
 import { resetMemberPassword, setMemberActive, updateUserPermissions } from './actions';
 
 export interface MemberRow {
@@ -39,13 +40,12 @@ function PasswordResetControl({ profileId }: { profileId: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex gap-1.5">
-        <input
-          type="password"
+        <PasswordInput
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="รหัสผ่านใหม่ (8+ ตัว)"
           minLength={8}
-          className="field !h-8 !py-1 !text-xs"
+          className="!h-8 !py-1 !pr-8 !text-xs"
         />
         <button
           type="button"

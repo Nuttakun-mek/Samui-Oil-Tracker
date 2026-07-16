@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { STATION_IDS, STATION_LABEL, type StationId } from '@/lib/types/domain';
 import type { UserRole } from '@/lib/auth/page-access';
+import { PasswordInput } from '@/components/ui/password-input';
 import { createMember } from './actions';
 
 export function AddMemberForm() {
@@ -46,7 +47,7 @@ export function AddMemberForm() {
           </div>
           <div>
             <label className="field-label">รหัสผ่านเริ่มต้น</label>
-            <input name="password" type="password" required minLength={8} className="field" />
+            <PasswordInput name="password" required minLength={8} />
           </div>
           <div>
             <label className="field-label">Role</label>
