@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import { formatThaiDate, formatThaiDateShort } from '@/lib/format/thai-date';
 import { STATION_LABEL, type FuelRecord, type Station } from '@/lib/types/domain';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
-import { buildTrendBuckets, computeStationInsights, findAnomalies, type StationInsight } from '@/lib/analytics/station-insight';
+import { buildTrendBuckets, computeStationInsights, findAnomalies, suggestPeriodMode, type StationInsight } from '@/lib/analytics/station-insight';
 import { drawTrendChart } from './pdf-chart';
 import { APP_RELEASE } from '@/lib/app-version';
 
@@ -117,7 +117,7 @@ function drawExecutiveSummary(doc: InstanceType<typeof PDFDocument>, stations: S
 
   const chartY = kpiY + kpiHeight + 22;
   const chartHeight = 168;
-  const periodMode = daySpanDays(from, to) > 60 ? 'monthly' : 'daily';
+  const periodMode = suggestPeriodMode(from, to);
   const buckets = buildTrendBuckets(records, periodMode);
   drawTrendChart(doc, { x: MARGIN, y: chartY, width: TABLE_WIDTH, height: chartHeight }, buckets);
 
@@ -157,11 +157,6 @@ function drawExecutiveSummary(doc: InstanceType<typeof PDFDocument>, stations: S
     doc.text(`•  ${bullet}`, MARGIN, lineY, { width: TABLE_WIDTH, lineGap: 2 });
     lineY = doc.y + 3;
   }
-}
-
-function daySpanDays(from: string, to: string) {
-  const dayMs = 24 * 60 * 60 * 1000;
-  return Math.round((new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime()) / dayMs) + 1;
 }
 
 export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], from: string, to: string, thaiFont: Buffer) {

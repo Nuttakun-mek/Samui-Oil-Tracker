@@ -16,7 +16,7 @@ import {
 import { STATION_LABEL, type FuelRecord, type Station, type StationId } from '@/lib/types/domain';
 import { formatThaiDate, formatThaiDateShort, formatThaiMonth } from '@/lib/format/thai-date';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
-import { buildTrendBuckets, computeStationInsight } from '@/lib/analytics/station-insight';
+import { buildTrendBuckets, computeStationInsight, suggestPeriodMode } from '@/lib/analytics/station-insight';
 import { DatePicker } from '@/components/ui/date-picker';
 import { MonthPicker } from '@/components/ui/month-picker';
 
@@ -121,6 +121,8 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
     setMonthFilter('');
     setFromDate('');
     setToDate('');
+    const start = rangeStart(latestDate, value);
+    setPeriodMode(start && latestDate ? suggestPeriodMode(start, latestDate) : 'monthly');
   };
 
   const selectMonth = (value: string) => {
@@ -128,13 +130,23 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
     setRangeMode('all');
     setFromDate('');
     setToDate('');
+    if (!value) {
+      setPeriodMode('monthly');
+      return;
+    }
+    const [year, monthNumber] = value.split('-').map(Number);
+    const lastDay = String(new Date(year, monthNumber, 0).getDate()).padStart(2, '0');
+    setPeriodMode(suggestPeriodMode(`${value}-01`, `${value}-${lastDay}`));
   };
 
   const selectDate = (side: 'from' | 'to', value: string) => {
     setRangeMode('all');
     setMonthFilter('');
+    const nextFrom = side === 'from' ? value : fromDate;
+    const nextTo = side === 'to' ? value : toDate;
     if (side === 'from') setFromDate(value);
     else setToDate(value);
+    setPeriodMode(suggestPeriodMode(nextFrom, nextTo));
   };
 
   const resetFilters = () => {

@@ -89,6 +89,15 @@ export interface TrendBucket {
   closing: number;
 }
 
+// เกณฑ์เดียวที่ใช้ตัดสินว่ากราฟแนวโน้มควรแสดงรายวันหรือรายเดือน — ใช้ร่วมกันทั้ง dashboard และ PDF
+// เพื่อไม่ให้ช่วงวันที่ที่เลือกไว้แคบ (เช่น 7 วัน) ถูกยุบรวมเป็นแท่งเดียวรายเดือนจนดูไม่มีข้อมูล
+export function suggestPeriodMode(from: string, to: string, maxDailySpanDays = 45): PeriodMode {
+  if (!from || !to) return 'daily';
+  const dayMs = 24 * 60 * 60 * 1000;
+  const spanDays = Math.round((new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime()) / dayMs) + 1;
+  return spanDays > 0 && spanDays <= maxDailySpanDays ? 'daily' : 'monthly';
+}
+
 export function buildTrendBuckets(records: FuelRecord[], periodMode: PeriodMode): TrendBucket[] {
   const buckets = new Map<
     string,
