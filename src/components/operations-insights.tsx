@@ -1,6 +1,10 @@
-import { CalendarCheck, Gauge, Target, TrendingUp } from 'lucide-react';
-import { formatThaiMonth } from '@/lib/format/thai-date';
-import { type FuelRecord, type Station } from '@/lib/types/domain';
+'use client';
+
+import { useState } from 'react';
+import { CalendarCheck, ChevronDown, ChevronUp, Gauge, Target, TrendingUp } from 'lucide-react';
+import { formatThaiDate, formatThaiMonth } from '@/lib/format/thai-date';
+import { STATION_LABEL, type FuelRecord, type Station } from '@/lib/types/domain';
+import { findAnomalies } from '@/lib/analytics/station-insight';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -9,6 +13,8 @@ function daySpan(from: string, to: string) {
 }
 
 export function OperationsInsights({ stations, records }: { stations: Station[]; records: FuelRecord[] }) {
+  const [showAnomalies, setShowAnomalies] = useState(false);
+
   const expectedDays = stations.reduce((sum, station) => {
     const stationRecords = records.filter((record) => record.station_id === station.id);
     return stationRecords.length ? sum + daySpan(stationRecords[0].record_date, stationRecords.at(-1)!.record_date) : sum;
@@ -27,19 +33,7 @@ export function OperationsInsights({ stations, records }: { stations: Station[];
   }, new Map());
   const peakMonth = [...usageByMonth.entries()].sort((a, b) => b[1] - a[1])[0];
 
-  const stationAverages = new Map(
-    stations.map((station) => {
-      const stationRecords = records.filter((record) => record.station_id === station.id);
-      const average = stationRecords.length
-        ? stationRecords.reduce((sum, record) => sum + record.dispatched_liters, 0) / stationRecords.length
-        : 0;
-      return [station.id, average] as const;
-    })
-  );
-  const unusualDays = records.filter((record) => {
-    const average = stationAverages.get(record.station_id) ?? 0;
-    return average > 0 && record.dispatched_liters > average * 2;
-  }).length;
+  const anomalies = findAnomalies(stations, records);
 
   const insights = [
     {
@@ -63,13 +57,6 @@ export function OperationsInsights({ stations, records }: { stations: Station[];
       icon: TrendingUp,
       tone: 'text-gold-700 bg-gold-50',
     },
-    {
-      label: 'วันที่ใช้สูงกว่าค่าเฉลี่ย 2 เท่า',
-      value: unusualDays.toLocaleString('th-TH'),
-      detail: 'ใช้เป็นรายการสำหรับตรวจสอบความผิดปกติ',
-      icon: Gauge,
-      tone: 'text-slate-700 bg-slate-100',
-    },
   ];
 
   return (
@@ -89,7 +76,55 @@ export function OperationsInsights({ stations, records }: { stations: Station[];
             <div className="mt-1 text-xs leading-5 text-slate-500">{detail}</div>
           </div>
         ))}
+
+        <button
+          type="button"
+          onClick={() => setShowAnomalies((current) => !current)}
+          disabled={anomalies.length === 0}
+          aria-expanded={showAnomalies}
+          className="rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-slate-300 disabled:cursor-default disabled:hover:border-slate-200"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md text-slate-700 bg-slate-100">
+              <Gauge size={18} aria-hidden="true" />
+            </div>
+            {anomalies.length > 0 && (showAnomalies ? <ChevronUp size={16} className="mt-1 text-slate-400" /> : <ChevronDown size={16} className="mt-1 text-slate-400" />)}
+          </div>
+          <div className="mt-3 text-xs font-bold text-slate-600">วันที่ใช้สูงกว่าค่าเฉลี่ย 2 เท่า</div>
+          <div className="mt-1 text-xl font-extrabold text-slate-950 tabular-nums">{anomalies.length.toLocaleString('th-TH')}</div>
+          <div className="mt-1 text-xs leading-5 text-slate-500">{anomalies.length ? 'คลิกเพื่อดูรายการ' : 'ไม่พบความผิดปกติในช่วงนี้'}</div>
+        </button>
       </div>
+
+      {showAnomalies && anomalies.length > 0 && (
+        <div className="table-shell">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="table-header">
+                <th className="px-3 py-2 text-left">วันที่</th>
+                <th className="px-3 py-2 text-left">พื้นที่</th>
+                <th className="px-3 py-2 text-right">ใช้จริง</th>
+                <th className="px-3 py-2 text-right">ค่าเฉลี่ย</th>
+                <th className="px-3 py-2 text-right">เกินค่าเฉลี่ย</th>
+              </tr>
+            </thead>
+            <tbody>
+              {anomalies.slice(0, 50).map(({ record, average, ratio }) => (
+                <tr key={record.id} className="border-t border-slate-200">
+                  <td className="whitespace-nowrap px-3 py-2">{formatThaiDate(record.record_date)}</td>
+                  <td className="px-3 py-2 font-semibold">{STATION_LABEL[record.station_id]}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{Math.round(record.dispatched_liters).toLocaleString('th-TH')}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-500">{Math.round(average).toLocaleString('th-TH')}</td>
+                  <td className="px-3 py-2 text-right font-bold tabular-nums text-red-700">{ratio.toFixed(1)}×</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {anomalies.length > 50 && (
+            <p className="px-3 py-2 text-xs text-slate-500">แสดง 50 รายการแรกจากทั้งหมด {anomalies.length.toLocaleString('th-TH')} รายการ</p>
+          )}
+        </div>
+      )}
     </section>
   );
 }

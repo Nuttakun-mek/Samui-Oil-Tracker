@@ -6,7 +6,9 @@ import { InsightList } from '@/components/insight-list';
 import { DashboardAnalytics } from '@/components/dashboard-analytics';
 import { OperationsInsights } from '@/components/operations-insights';
 import { requirePageAccess } from '@/lib/auth/server';
-import { estimatedFuelCost, stationCoverage } from '@/lib/analytics/fuel';
+import { estimatedFuelCost } from '@/lib/analytics/fuel';
+import { computeStationInsights } from '@/lib/analytics/station-insight';
+import { LowStockBanner } from '@/components/low-stock-banner';
 import Link from 'next/link';
 import { DatabaseZap, FileUp } from 'lucide-react';
 
@@ -26,6 +28,7 @@ export default async function DashboardPage() {
   const stationList = ((stations ?? []) as Station[])
     .sort((a, b) => (stationOrder.get(a.id) ?? 99) - (stationOrder.get(b.id) ?? 99));
   const recordList = (records ?? []) as FuelRecord[];
+  const stationInsights = computeStationInsights(stationList, recordList);
   const latestRecordDate = recordList.length ? recordList[recordList.length - 1].record_date : null;
   const recentStartDate = latestRecordDate
     ? new Date(new Date(`${latestRecordDate}T00:00:00`).getTime() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -107,26 +110,27 @@ export default async function DashboardPage() {
         </section>
       ) : (
         <>
+      <LowStockBanner insights={stationInsights} />
+
       <section>
         <div className="mb-3">
           <h2 className="text-lg font-extrabold text-slate-950">สถานะน้ำมันรายพื้นที่</h2>
           <p className="text-sm text-slate-600">ยอดคงเหลือล่าสุด อัตราใช้ปกติ และจำนวนวันที่คาดว่าจะใช้งานได้ของแต่ละพื้นที่</p>
         </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {stationList.map((st) => {
-          const rec = latest(st.id);
-          const cur = rec?.closing_liters ?? 0;
-          const pct = st.tank_capacity_liters > 0 ? (cur / st.tank_capacity_liters) * 100 : 0;
-          const coverage = stationCoverage(st, recordList);
+        {stationInsights.map((insight) => {
+          const st = insight.station;
+          const pct = st.tank_capacity_liters > 0 ? (insight.closing / st.tank_capacity_liters) * 100 : 0;
           return (
             <TankGauge
               key={st.id}
               label={st.name}
-              liters={cur}
+              liters={insight.closing}
               capacity={st.tank_capacity_liters}
               pct={pct}
-              averageDailyUsage={coverage.averageDailyUsage}
-              daysRemaining={coverage.daysRemaining}
+              averageDailyUsage={insight.averageDaily}
+              daysRemaining={insight.daysRemaining}
+              etaDate={insight.etaDate}
               lowStockDays={st.low_stock_days}
             />
           );

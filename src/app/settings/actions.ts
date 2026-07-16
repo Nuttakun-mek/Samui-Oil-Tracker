@@ -274,8 +274,68 @@ export async function createMember(formData: FormData) {
     if (accessError) return { ok: false as const, error: accessError.message };
   }
 
+  const supabase = await createClient();
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
+  await admin.from('permission_audit').insert({
+    target_profile_id: userId,
+    changed_by: currentUser?.id ?? null,
+    action: 'created',
+    previous_role: null,
+    new_role: role,
+    previous_station_ids: [],
+    new_station_ids: finalStationIds,
+  });
+
   revalidatePath('/settings');
   return { ok: true as const, email };
+}
+
+export async function resetMemberPassword(profileId: string, password: string) {
+  await requireAdmin();
+
+  if (!profileId) return { ok: false as const, error: 'ไม่พบผู้ใช้' };
+  if (password.length < 8) return { ok: false as const, error: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' };
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { ok: false as const, error: 'ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY ใน .env.local จึงรีเซ็ตรหัสผ่านจากแอปไม่ได้' };
+  }
+
+  const { error } = await admin.auth.admin.updateUserById(profileId, { password });
+  if (error) return { ok: false as const, error: error.message };
+
+  return { ok: true as const };
+}
+
+export async function setMemberActive(profileId: string, active: boolean) {
+  await requireAdmin();
+
+  if (!profileId) return { ok: false as const, error: 'ไม่พบผู้ใช้' };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user?.id === profileId && !active) {
+    return { ok: false as const, error: 'ไม่สามารถปิดใช้งานบัญชีของตัวเองได้' };
+  }
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { ok: false as const, error: 'ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY ใน .env.local จึงเปลี่ยนสถานะบัญชีจากแอปไม่ได้' };
+  }
+
+  const { error } = await admin.auth.admin.updateUserById(profileId, { ban_duration: active ? 'none' : '876000h' });
+  if (error) return { ok: false as const, error: error.message };
+
+  revalidatePath('/settings');
+  return { ok: true as const };
 }
 
 const THAI_DIGITS: Record<string, string> = {

@@ -1,13 +1,15 @@
 import { createClient } from '@/lib/supabase/server';
-import { STATION_LABEL, type Station, type StationId } from '@/lib/types/domain';
-import { APP_NAV_ITEMS, canAccessPage, normalizeRole, type UserRole } from '@/lib/auth/page-access';
-import { updateStationSettings, updateUserPermissions } from './actions';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { STATION_LABEL, type Station } from '@/lib/types/domain';
+import type { UserRole } from '@/lib/auth/page-access';
+import { updateStationSettings } from './actions';
 import { OPERATIONAL_DATA_TABLES, type OperationalDataCounts } from './reset-data-config';
 import { requirePageAccess } from '@/lib/auth/server';
 import { ImportRecordsPanel } from './import-records-panel';
 import { AddMemberForm } from './add-member-form';
 import { DatabaseExportImportPanel } from './database-export-import-panel';
 import { ResetDataPanel } from './reset-data-panel';
+import { MembersTable, type MemberRow } from './members-table';
 
 export const revalidate = 0;
 
@@ -34,14 +36,12 @@ export default async function SettingsPage() {
     role: UserRole;
     created_at: string;
   }>;
-  const accessByProfile = new Map<string, Set<string>>();
+  const accessByProfile: Record<string, string[]> = {};
 
   for (const access of stationAccess ?? []) {
     const profileId = access.profile_id as string;
     const stationId = access.station_id as string;
-    const current = accessByProfile.get(profileId) ?? new Set<string>();
-    current.add(stationId);
-    accessByProfile.set(profileId, current);
+    accessByProfile[profileId] = [...(accessByProfile[profileId] ?? []), stationId];
   }
 
   const {
@@ -53,6 +53,65 @@ export default async function SettingsPage() {
     .eq('id', user?.id ?? '')
     .single();
   const isAdmin = profile?.role === 'admin';
+
+  let members: MemberRow[] = profileList.map((p) => ({
+    id: p.id,
+    full_name: p.full_name,
+    role: p.role,
+    email: null,
+    lastSignInAt: null,
+    active: true,
+    createdAt: p.created_at,
+  }));
+  let auditRows: Array<{
+    id: number;
+    target_profile_id: string;
+    changed_by: string | null;
+    action: string;
+    previous_role: string | null;
+    new_role: string | null;
+    previous_station_ids: string[] | null;
+    new_station_ids: string[] | null;
+    changed_at: string;
+  }> = [];
+  let adminToolsError: string | null = null;
+
+  if (isAdmin) {
+    try {
+      const admin = createAdminClient();
+      const authDetails = await Promise.all(
+        profileList.map(async (p) => {
+          const { data } = await admin.auth.admin.getUserById(p.id);
+          return [p.id, data.user] as const;
+        })
+      );
+      const authByProfile = new Map(authDetails);
+      members = profileList.map((p) => {
+        const authUser = authByProfile.get(p.id);
+        const bannedUntil = authUser?.banned_until ? new Date(authUser.banned_until) : null;
+        return {
+          id: p.id,
+          full_name: p.full_name,
+          role: p.role,
+          email: authUser?.email ?? null,
+          lastSignInAt: authUser?.last_sign_in_at ?? null,
+          active: !bannedUntil || bannedUntil.getTime() <= Date.now(),
+          createdAt: p.created_at,
+        };
+      });
+
+      const { data: audit } = await admin
+        .from('permission_audit')
+        .select('*')
+        .order('changed_at', { ascending: false })
+        .limit(100);
+      auditRows = audit ?? [];
+    } catch {
+      adminToolsError = 'ยังไม่ได้ตั้งค่า SUPABASE_SERVICE_ROLE_KEY ใน .env.local จึงแสดงอีเมล/ประวัติสิทธิ์ไม่ได้ (แก้ไข role/สถานีได้ตามปกติ)';
+    }
+  }
+
+  const profileNameById = new Map(profileList.map((p) => [p.id, p.full_name || p.id.slice(0, 8)]));
 
   return (
     <div className="w-full space-y-7">
@@ -74,9 +133,15 @@ export default async function SettingsPage() {
           <a href="#data-reset" className="chip whitespace-nowrap">ล้างข้อมูล</a>
           <a href="#spreadsheet-import" className="chip whitespace-nowrap">นำเข้า Excel</a>
           <a href="#database-import" className="chip whitespace-nowrap">นำเข้าฐานข้อมูล</a>
-          <a href="#members" className="chip whitespace-nowrap">สมาชิก</a>
-          <a href="#permissions" className="chip whitespace-nowrap">สิทธิ์ผู้ใช้</a>
+          <a href="#members" className="chip whitespace-nowrap">สมาชิกและสิทธิ์</a>
+          <a href="#audit" className="chip whitespace-nowrap">ประวัติการเปลี่ยนสิทธิ์</a>
         </nav>
+      )}
+
+      {isAdmin && adminToolsError && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm font-semibold text-amber-800">
+          {adminToolsError}
+        </div>
       )}
 
       <section id="station-settings" className="scroll-mt-32 space-y-3">
@@ -149,164 +214,61 @@ export default async function SettingsPage() {
       )}
 
       {isAdmin && (
-        <div id="members" className="scroll-mt-32">
+        <div id="members" className="scroll-mt-32 space-y-5">
           <AddMemberForm />
+
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-950">จัดการสมาชิกและสิทธิ์</h2>
+              <p className="text-sm text-slate-600">ค้นหาสมาชิก กำหนด role, หน้าที่เข้าได้, สถานีที่เข้าถึงได้, รีเซ็ตรหัสผ่าน หรือปิดใช้งานบัญชี</p>
+            </div>
+            <MembersTable members={members} stations={list} accessByProfile={accessByProfile} currentUserId={user?.id ?? ''} />
+          </section>
         </div>
       )}
 
       {isAdmin && (
-        <section id="permissions" className="scroll-mt-32 space-y-3">
+        <section id="audit" className="scroll-mt-32 space-y-3">
           <div>
-            <h2 className="text-lg font-extrabold text-slate-950">จัดการสิทธิ์ผู้ใช้</h2>
-            <p className="text-sm text-slate-600">กำหนด role, หน้าที่เข้าได้ และสถานีที่ผู้ใช้ field อ่าน/บันทึกได้</p>
+            <h2 className="text-lg font-extrabold text-slate-950">ประวัติการเปลี่ยนสิทธิ์</h2>
+            <p className="text-sm text-slate-600">บันทึกทุกครั้งที่มีการสร้างสมาชิกหรือเปลี่ยน role/สถานีที่เข้าถึงได้ — ตรวจสอบย้อนหลังได้ว่าใครแก้ไขอะไรเมื่อไหร่</p>
           </div>
-
-          <div className="grid gap-3 lg:hidden">
-            {profileList.length === 0 && (
-              <div className="panel py-10 text-center text-sm text-slate-500">ไม่พบผู้ใช้</div>
-            )}
-            {profileList.map((profile) => {
-              const role = normalizeRole(profile.role);
-              const access = accessByProfile.get(profile.id) ?? new Set<string>();
-
-              return (
-                <article key={profile.id} className="panel space-y-3">
-                  <div>
-                    <div className="text-sm font-extrabold text-slate-950">{profile.full_name || 'ยังไม่ระบุชื่อ'}</div>
-                    <div className="mt-1 break-all text-xs text-slate-500">{profile.id}</div>
-                  </div>
-
-                  <form id={`permission-mobile-${profile.id}`} action={updateUserPermissions} className="space-y-3">
-                    <input type="hidden" name="profile_id" value={profile.id} />
-                    <div>
-                      <label className="field-label">Role</label>
-                      <select name="role" defaultValue={role} className="field">
-                        <option value="field">field</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    </div>
-                  </form>
-
-                  <div>
-                    <div className="field-label">สิทธิ์เข้าหน้า</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {APP_NAV_ITEMS.map((item) => (
-                        <span
-                          key={item.id}
-                          className={`chip !px-2.5 !py-1 !text-xs ${
-                            canAccessPage(role, item.id) ? 'chip-active' : 'opacity-40'
-                          }`}
-                        >
-                          {item.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="field-label">สถานี</div>
-                    <div className="grid gap-2">
-                      {list.map((station) => (
-                        <label key={station.id} className="inline-flex items-start gap-2 text-sm">
-                          <input
-                            form={`permission-mobile-${profile.id}`}
-                            type="checkbox"
-                            name="station_ids"
-                            value={station.id}
-                            defaultChecked={role === 'admin' || access.has(station.id)}
-                            className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
-                          />
-                          <span className="leading-5">{STATION_LABEL[station.id as StationId] ?? station.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button form={`permission-mobile-${profile.id}`} type="submit" className="btn-primary w-full">
-                    บันทึกสิทธิ์
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-
-          <div className="table-shell hidden lg:block">
+          <div className="table-shell">
             <table className="w-full text-sm">
               <thead>
                 <tr className="table-header">
-                  <th className="text-left px-3.5 py-2.5">ผู้ใช้</th>
-                  <th className="text-left px-3.5 py-2.5">Role</th>
-                  <th className="text-left px-3.5 py-2.5">สิทธิ์เข้าหน้า</th>
-                  <th className="text-left px-3.5 py-2.5">สถานี</th>
-                  <th />
+                  <th className="text-left px-3.5 py-2.5">เวลา</th>
+                  <th className="text-left px-3.5 py-2.5">สมาชิก</th>
+                  <th className="text-left px-3.5 py-2.5">แก้ไขโดย</th>
+                  <th className="text-left px-3.5 py-2.5">การเปลี่ยนแปลง</th>
                 </tr>
               </thead>
               <tbody>
-                {profileList.length === 0 && (
+                {auditRows.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center py-10 text-slate-500">
-                      ไม่พบผู้ใช้
+                    <td colSpan={4} className="text-center py-10 text-slate-500">
+                      ยังไม่มีประวัติการเปลี่ยนสิทธิ์
                     </td>
                   </tr>
                 )}
-                {profileList.map((profile) => {
-                  const role = normalizeRole(profile.role);
-                  const access = accessByProfile.get(profile.id) ?? new Set<string>();
-
-                  return (
-                    <tr key={profile.id} className="border-b border-slate-200 last:border-0 align-top hover:bg-slate-50">
-                      <td className="px-3.5 py-3 min-w-56">
-                        <div className="font-bold text-slate-950">{profile.full_name || 'ยังไม่ระบุชื่อ'}</div>
-                        <div className="text-xs text-slate-500 tabular-nums break-all">{profile.id}</div>
-                      </td>
-                      <td className="px-3.5 py-3">
-                        <form id={`permission-${profile.id}`} action={updateUserPermissions} className="space-y-3">
-                          <input type="hidden" name="profile_id" value={profile.id} />
-                          <select name="role" defaultValue={role} className="field min-w-28">
-                            <option value="field">field</option>
-                            <option value="admin">admin</option>
-                          </select>
-                        </form>
-                      </td>
-                      <td className="px-3.5 py-3 min-w-52">
-                        <div className="flex flex-wrap gap-1.5">
-                          {APP_NAV_ITEMS.map((item) => (
-                            <span
-                              key={item.id}
-                              className={`chip !px-2.5 !py-1 !text-xs ${
-                                canAccessPage(role, item.id) ? 'chip-active' : 'opacity-40'
-                              }`}
-                            >
-                              {item.label}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-3.5 py-3 min-w-64">
-                        <div className="grid gap-2">
-                          {list.map((station) => (
-                            <label key={station.id} className="inline-flex items-center gap-2 text-sm">
-                              <input
-                                form={`permission-${profile.id}`}
-                                type="checkbox"
-                                name="station_ids"
-                                value={station.id}
-                                defaultChecked={role === 'admin' || access.has(station.id)}
-                                className="h-4 w-4 accent-brand-600"
-                              />
-                              <span>{STATION_LABEL[station.id as StationId] ?? station.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-3.5 py-3 text-right">
-                        <button form={`permission-${profile.id}`} type="submit" className="btn-primary whitespace-nowrap">
-                          บันทึกสิทธิ์
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {auditRows.map((row) => (
+                  <tr key={row.id} className="border-b border-slate-200 last:border-0 align-top hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-3.5 py-3 tabular-nums">{new Date(row.changed_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                    <td className="px-3.5 py-3 font-semibold">{profileNameById.get(row.target_profile_id) ?? row.target_profile_id}</td>
+                    <td className="px-3.5 py-3">{row.changed_by ? profileNameById.get(row.changed_by) ?? row.changed_by : '-'}</td>
+                    <td className="px-3.5 py-3">
+                      {row.action === 'created' ? (
+                        <span>สร้างสมาชิกใหม่ role <strong>{row.new_role}</strong> · สถานี {(row.new_station_ids ?? []).map((id) => STATION_LABEL[id as keyof typeof STATION_LABEL] ?? id).join(', ') || '-'}</span>
+                      ) : (
+                        <span>
+                          role {row.previous_role ?? '-'} → <strong>{row.new_role}</strong>
+                          <br />
+                          สถานี {(row.previous_station_ids ?? []).map((id) => STATION_LABEL[id as keyof typeof STATION_LABEL] ?? id).join(', ') || '-'} → {(row.new_station_ids ?? []).map((id) => STATION_LABEL[id as keyof typeof STATION_LABEL] ?? id).join(', ') || '-'}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

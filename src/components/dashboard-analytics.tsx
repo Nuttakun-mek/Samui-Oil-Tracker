@@ -14,8 +14,9 @@ import {
   YAxis,
 } from 'recharts';
 import { STATION_LABEL, type FuelRecord, type Station, type StationId } from '@/lib/types/domain';
-import { formatThaiDateShort, formatThaiMonth } from '@/lib/format/thai-date';
+import { formatThaiDate, formatThaiDateShort, formatThaiMonth } from '@/lib/format/thai-date';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
+import { buildTrendBuckets, computeStationInsight } from '@/lib/analytics/station-insight';
 
 type PeriodMode = 'daily' | 'monthly';
 type RangeMode = 'all' | '30' | '90' | '180';
@@ -33,10 +34,6 @@ const RANGE_OPTIONS: { value: RangeMode; label: string }[] = [
   { value: '90', label: '90 วัน' },
   { value: '180', label: '180 วัน' },
 ];
-
-function monthKey(date: string) {
-  return date.slice(0, 7);
-}
 
 function rangeStart(latestDate: string | null, range: RangeMode) {
   if (!latestDate || range === 'all') return null;
@@ -70,35 +67,15 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
     return true;
   }), [fromDate, monthFilter, records, startDate, stationFilter, toDate]);
 
-  const chartData = useMemo(() => {
-    const buckets = new Map<string, {
-      period: string;
-      received: number;
-      dispatched: number;
-      closingByStation: Partial<Record<StationId, { date: string; value: number }>>;
-    }>();
-
-    filteredRecords.forEach((record) => {
-      const period = periodMode === 'monthly' ? monthKey(record.record_date) : record.record_date;
-      const bucket = buckets.get(period) ?? { period, received: 0, dispatched: 0, closingByStation: {} };
-      bucket.received += record.received_liters;
-      bucket.dispatched += record.dispatched_liters;
-      const currentClosing = bucket.closingByStation[record.station_id];
-      if (!currentClosing || record.record_date >= currentClosing.date) {
-        bucket.closingByStation[record.station_id] = { date: record.record_date, value: record.closing_liters };
-      }
-      buckets.set(period, bucket);
-    });
-
-    return Array.from(buckets.values())
-      .sort((a, b) => a.period.localeCompare(b.period))
-      .map((bucket) => ({
-        period: periodMode === 'monthly' ? formatThaiMonth(bucket.period) : formatThaiDateShort(bucket.period),
-        received: bucket.received,
-        dispatched: bucket.dispatched,
-        closing: Object.values(bucket.closingByStation).reduce((sum, item) => sum + (item?.value ?? 0), 0),
-      }));
-  }, [filteredRecords, periodMode]);
+  const chartData = useMemo(
+    () => buildTrendBuckets(filteredRecords, periodMode).map((bucket) => ({
+      period: bucket.periodLabel,
+      received: bucket.received,
+      dispatched: bucket.dispatched,
+      closing: bucket.closing,
+    })),
+    [filteredRecords, periodMode]
+  );
 
   const totals = useMemo(() => {
     const latestByStation = new Map<StationId, FuelRecord>();
@@ -118,45 +95,8 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
 
   const stationInsights = useMemo(() => stations
     .filter((station) => stationFilter === 'all' || station.id === stationFilter)
-    .map((station) => {
-      const stationRecords = filteredRecords.filter((record) => record.station_id === station.id);
-      const received = stationRecords.reduce((sum, record) => sum + record.received_liters, 0);
-      const dispatched = stationRecords.reduce((sum, record) => sum + record.dispatched_liters, 0);
-      const activeDays = new Set(stationRecords.map((record) => record.record_date)).size;
-      const latest = stationRecords.at(-1) ?? null;
-      const latestSeven = stationRecords.slice(-7);
-      const previousSeven = stationRecords.slice(-14, -7);
-      const recentUsage = latestSeven.reduce((sum, record) => sum + record.dispatched_liters, 0);
-      const previousUsage = previousSeven.reduce((sum, record) => sum + record.dispatched_liters, 0);
-      const averageDaily = latestSeven.length ? recentUsage / latestSeven.length : 0;
-      const daysRemaining = averageDaily > 0 && latest ? latest.closing_liters / averageDaily : null;
-      const trend = previousUsage > 0 ? ((recentUsage - previousUsage) / previousUsage) * 100 : null;
-      const peak = stationRecords.reduce<FuelRecord | null>(
-        (highest, record) => !highest || record.dispatched_liters > highest.dispatched_liters ? record : highest,
-        null
-      );
-      const status = daysRemaining !== null && daysRemaining < station.low_stock_days
-        ? 'danger'
-        : daysRemaining !== null && daysRemaining < station.low_stock_days * 1.5
-          ? 'warn'
-          : 'ok';
-
-      return {
-        station,
-        records: stationRecords.length,
-        received,
-        dispatched,
-        closing: latest?.closing_liters ?? 0,
-        averageDaily,
-        daysRemaining,
-        trend,
-        peak,
-        status,
-        activeDays,
-        share: totals.dispatched > 0 ? (dispatched / totals.dispatched) * 100 : 0,
-        budget: estimatedFuelCost([station], stationRecords),
-      };
-    }), [filteredRecords, stationFilter, stations, totals.dispatched]);
+    .map((station) => computeStationInsight(station, filteredRecords, totals.dispatched)),
+    [filteredRecords, stationFilter, stations, totals.dispatched]);
 
   const netChange = totals.received - totals.dispatched;
   const usageRatio = totals.received > 0 ? (totals.dispatched / totals.received) * 100 : 0;
@@ -204,11 +144,11 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
     setPeriodMode('monthly');
   };
 
-  const highestUsage = stationInsights.filter((item) => item.records > 0).sort((a, b) => b.dispatched - a.dispatched)[0];
+  const highestUsage = stationInsights.filter((item) => item.records.length > 0).sort((a, b) => b.dispatched - a.dispatched)[0];
   const lowestCoverage = stationInsights
     .filter((item) => item.daysRemaining !== null)
     .sort((a, b) => (a.daysRemaining ?? Infinity) - (b.daysRemaining ?? Infinity))[0];
-  const highestBudget = stationInsights.filter((item) => item.records > 0).sort((a, b) => b.budget - a.budget)[0];
+  const highestBudget = stationInsights.filter((item) => item.records.length > 0).sort((a, b) => b.budget - a.budget)[0];
 
   return (
     <section className="panel overflow-hidden !p-0">
@@ -382,7 +322,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
             <p className="text-sm text-slate-500">เปรียบเทียบจากข้อมูลที่ผ่านตัวกรองเดียวกับกราฟ</p>
           </div>
 
-          {stationFilter === 'all' && stationInsights.some((item) => item.records > 0) && (
+          {stationFilter === 'all' && stationInsights.some((item) => item.records.length > 0) && (
             <div className="mb-3 grid gap-2 md:grid-cols-3">
               <div className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm">
                 <span className="text-xs font-bold text-brand-700">ใช้น้ำมันสูงสุด</span>
@@ -425,6 +365,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
                     <div>
                       <dt className="text-xs text-slate-500">คาดว่าใช้ได้อีก</dt>
                       <dd className={`font-extrabold tabular-nums ${item.status === 'danger' ? 'text-red-700' : 'text-slate-950'}`}>{item.daysRemaining === null ? '-' : `${item.daysRemaining.toFixed(1)} วัน`}</dd>
+                      {item.etaDate && <dd className="text-xs font-semibold text-slate-500">คาดหมดวันที่ {formatThaiDate(item.etaDate)}</dd>}
                     </div>
                     <div>
                       <dt className="text-xs text-slate-500">รับเข้า / ใช้ออก</dt>
@@ -440,8 +381,8 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
                     </div>
                     <div>
                       <dt className="text-xs text-slate-500">แนวโน้ม 7 รายการ</dt>
-                      <dd className={`flex items-center gap-1 font-bold tabular-nums ${item.trend !== null && item.trend > 0 ? 'text-red-700' : 'text-brand-700'}`}>
-                        {item.trend === null ? '-' : <>{item.trend > 0 ? <TrendingUp size={14} aria-hidden="true" /> : <TrendingDown size={14} aria-hidden="true" />}{Math.abs(item.trend).toFixed(1)}%</>}
+                      <dd className={`flex items-center gap-1 font-bold tabular-nums ${item.trendPct !== null && item.trendPct > 0 ? 'text-red-700' : 'text-brand-700'}`}>
+                        {item.trendPct === null ? '-' : <>{item.trendPct > 0 ? <TrendingUp size={14} aria-hidden="true" /> : <TrendingDown size={14} aria-hidden="true" />}{Math.abs(item.trendPct).toFixed(1)}%</>}
                       </dd>
                     </div>
                     <div>
@@ -453,7 +394,7 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
                       <dd className="font-bold tabular-nums text-slate-800">{item.budget.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท</dd>
                     </div>
                   </dl>
-                  <p className="mt-3 border-t border-slate-100 pt-2 text-[11px] text-slate-500">{item.records.toLocaleString('th-TH')} รายการ · {item.activeDays.toLocaleString('th-TH')} วันที่มีข้อมูล</p>
+                  <p className="mt-3 border-t border-slate-100 pt-2 text-[11px] text-slate-500">{item.records.length.toLocaleString('th-TH')} รายการ · {item.activeDays.toLocaleString('th-TH')} วันที่มีข้อมูล</p>
                 </article>
               );
             })}

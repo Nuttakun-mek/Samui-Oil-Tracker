@@ -1,3 +1,5 @@
+import { formatThaiDate } from '@/lib/format/thai-date';
+
 export function TankGauge({
   label,
   liters,
@@ -5,6 +7,7 @@ export function TankGauge({
   pct,
   averageDailyUsage,
   daysRemaining,
+  etaDate,
   lowStockDays,
 }: {
   label: string;
@@ -13,6 +16,7 @@ export function TankGauge({
   pct: number;
   averageDailyUsage: number;
   daysRemaining: number | null;
+  etaDate: string | null;
   lowStockDays: number;
 }) {
   const clamped = Math.max(0, Math.min(100, pct));
@@ -68,6 +72,7 @@ export function TankGauge({
           <dd className={`mt-0.5 text-base font-extrabold tabular-nums ${status === 'danger' ? 'text-red-700' : 'text-slate-900'}`}>
             {daysRemaining === null ? '-' : daysRemaining.toLocaleString('th-TH', { maximumFractionDigits: 1 })} <span className="text-xs font-semibold text-slate-500">วัน</span>
           </dd>
+          {etaDate && <dd className="mt-0.5 text-xs font-semibold text-slate-500">คาดหมดวันที่ {formatThaiDate(etaDate)}</dd>}
         </div>
       </dl>
       <p className="mt-2 text-[11px] leading-4 text-slate-500">คำนวณจากยอดคงเหลือ ÷ ยอดใช้เฉลี่ย 7 วันที่มีบันทึกล่าสุด</p>
