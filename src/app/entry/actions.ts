@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { computeClosing, fuelRecordEntrySchema, fuelRecordFormSchema, type FuelRecordFormValues } from '@/lib/types/domain';
 import { getCurrentUserAccess, requireAdmin, requirePageAccess } from '@/lib/auth/server';
+import { getMaintenanceState } from '@/lib/maintenance';
 
 export async function upsertFuelRecord(raw: FuelRecordFormValues) {
   await requirePageAccess('entry');
@@ -18,6 +19,9 @@ export async function upsertFuelRecord(raw: FuelRecordFormValues) {
   const access = await getCurrentUserAccess();
   if (access.role === 'viewer') {
     return { ok: false as const, error: 'บัญชีนี้มีสิทธิ์ดูอย่างเดียว ไม่สามารถบันทึกข้อมูลได้' };
+  }
+  if (access.role !== 'admin' && (await getMaintenanceState()).enabled) {
+    return { ok: false as const, error: 'ระบบกำลังปรับปรุง ไม่สามารถบันทึกข้อมูลได้ชั่วคราว กรุณาลองใหม่อีกครั้งภายหลัง' };
   }
   if (!access.stationIds.includes(values.station_id)) {
     return { ok: false as const, error: 'บัญชีนี้ไม่มีสิทธิ์บันทึกข้อมูลของพื้นที่ที่เลือก' };
@@ -119,6 +123,9 @@ export async function updateFuelRecord(id: string, raw: FuelRecordFormValues) {
   const access = await getCurrentUserAccess();
   if (access.role === 'viewer') {
     return { ok: false as const, error: 'บัญชีนี้มีสิทธิ์ดูอย่างเดียว ไม่สามารถแก้ไขข้อมูลได้' };
+  }
+  if (access.role !== 'admin' && (await getMaintenanceState()).enabled) {
+    return { ok: false as const, error: 'ระบบกำลังปรับปรุง ไม่สามารถแก้ไขข้อมูลได้ชั่วคราว กรุณาลองใหม่อีกครั้งภายหลัง' };
   }
   if (!access.stationIds.includes(values.station_id)) {
     return { ok: false as const, error: 'บัญชีนี้ไม่มีสิทธิ์แก้ไขข้อมูลของพื้นที่ที่เลือก' };

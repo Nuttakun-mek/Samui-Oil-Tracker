@@ -58,6 +58,38 @@ async function readOperationalDataCounts(supabase: Awaited<ReturnType<typeof cre
   return Object.fromEntries(entries) as OperationalDataCounts;
 }
 
+export async function setMaintenanceMode(formData: FormData) {
+  await requireAdmin();
+
+  const enabled = formData.get('maintenance_mode') === 'on';
+  const message = (formData.get('maintenance_message') as string)?.trim() || null;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { error } = await supabase
+    .from('app_settings')
+    .update({
+      maintenance_mode: enabled,
+      maintenance_message: message,
+      updated_by: user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', true);
+
+  if (error) {
+    const friendlyError = error.message.includes('app_settings')
+      ? 'ฐานข้อมูลยังไม่มีตาราง app_settings — กรุณารัน migration 0020_add_maintenance_mode.sql ใน Supabase SQL Editor ก่อน'
+      : error.message;
+    return { ok: false as const, error: friendlyError };
+  }
+
+  revalidatePath('/', 'layout');
+  return { ok: true as const };
+}
+
 export async function updateStationSettings(formData: FormData) {
   await requireAdmin();
 

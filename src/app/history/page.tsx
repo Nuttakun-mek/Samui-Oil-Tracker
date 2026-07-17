@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { STATION_IDS, STATION_LABEL, type FuelRecord } from '@/lib/types/domain';
 import { formatThaiDateCompact } from '@/lib/format/thai-date';
+import { getMaintenanceState } from '@/lib/maintenance';
 import Link from 'next/link';
 import { DeleteButton } from './delete-button';
 import { EditRecordButton } from './edit-record-button';
@@ -108,6 +109,8 @@ export default async function HistoryPage({
 }) {
   const role = await requirePageAccess('history');
   const access = await getCurrentUserAccess();
+  const maintenance = await getMaintenanceState();
+  const editLocked = maintenance.enabled && role !== 'admin';
 
   const supabase = await createClient();
   const { station: stationFilter } = await searchParams;
@@ -220,7 +223,7 @@ export default async function HistoryPage({
               </div>
               <div className="flex shrink-0 gap-2">
                 <RecordDocuments recordId={r.id} count={documentCounts.get(r.id) ?? 0} canEdit={role !== 'viewer'} />
-                {role !== 'viewer' && <EditRecordButton record={r} allowedStationIds={access.stationIds} />}
+                {role !== 'viewer' && <EditRecordButton record={r} allowedStationIds={access.stationIds} locked={editLocked} />}
                 {role === 'admin' && <DeleteButton id={r.id} />}
               </div>
             </div>
@@ -314,7 +317,7 @@ export default async function HistoryPage({
                 <td className="px-3.5 py-2.5">
                   <div className="flex justify-end gap-2">
                     <RecordDocuments recordId={r.id} count={documentCounts.get(r.id) ?? 0} canEdit={role !== 'viewer'} />
-                    {role !== 'viewer' && <EditRecordButton record={r} allowedStationIds={access.stationIds} />}
+                    {role !== 'viewer' && <EditRecordButton record={r} allowedStationIds={access.stationIds} locked={editLocked} />}
                     {role === 'admin' && <DeleteButton id={r.id} />}
                   </div>
                 </td>

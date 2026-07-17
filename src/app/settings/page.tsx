@@ -15,6 +15,7 @@ import { ProcurementPanel } from './procurement-panel';
 import { getProcurementSummary } from '@/lib/procurement';
 import { BackupRestorePanel } from './backup-restore-panel';
 import type { BackupJobRow, BackupSettingsRow } from '@/lib/backups/types';
+import { MaintenanceModePanel } from './maintenance-mode-panel';
 
 export const revalidate = 0;
 export const maxDuration = 300;
@@ -79,6 +80,9 @@ export default async function SettingsPage({
     .single();
   const isAdmin = profile?.role === 'admin';
   const procurementSummary = isAdmin ? await getProcurementSummary() : null;
+  const { data: appSettings } = isAdmin
+    ? await supabase.from('app_settings').select('maintenance_mode, maintenance_message').eq('id', true).maybeSingle()
+    : { data: null };
 
   let members: MemberRow[] = profileList.map((p) => ({
     id: p.id,
@@ -194,6 +198,10 @@ export default async function SettingsPage({
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm font-semibold text-amber-800">
           {adminToolsError}
         </div>
+      )}
+
+      {tab === 'stations' && isAdmin && (
+        <MaintenanceModePanel enabled={Boolean(appSettings?.maintenance_mode)} message={appSettings?.maintenance_message ?? null} />
       )}
 
       {tab === 'stations' && (

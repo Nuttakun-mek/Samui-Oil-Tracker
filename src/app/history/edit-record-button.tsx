@@ -17,7 +17,15 @@ function toNumber(value: FormDataEntryValue | null) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function EditRecordButton({ record, allowedStationIds }: { record: FuelRecord; allowedStationIds: StationId[] }) {
+export function EditRecordButton({
+  record,
+  allowedStationIds,
+  locked = false,
+}: {
+  record: FuelRecord;
+  allowedStationIds: StationId[];
+  locked?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [recordDate, setRecordDate] = useState(record.record_date);
@@ -74,7 +82,9 @@ export function EditRecordButton({ record, allowedStationIds }: { record: FuelRe
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50"
+        disabled={locked}
+        title={locked ? 'ระบบกำลังปรับปรุง แก้ไขข้อมูลไม่ได้ชั่วคราว' : undefined}
+        className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
       >
         แก้ไข
       </button>

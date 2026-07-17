@@ -12,7 +12,7 @@ import { upsertFuelRecord, getPreviousClosing } from './actions';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export default function EntryForm({ stations }: { stations: Station[] }) {
+export default function EntryForm({ stations, entryLocked = false }: { stations: Station[]; entryLocked?: boolean }) {
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<string | null>(null);
   const [previousDate, setPreviousDate] = useState<string | null>(null);
@@ -345,7 +345,14 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
         </label>
         {errors.confirmed && <p className="text-xs font-semibold text-red-600">{errors.confirmed.message}</p>}
 
-        <button type="submit" disabled={isPending || invalidClosing || stations.length === 0} className="btn-primary w-full sm:w-auto">
+        {entryLocked && (
+          <p className="text-xs font-bold text-amber-700">ระบบกำลังปรับปรุง ไม่สามารถบันทึกข้อมูลได้ชั่วคราว กรุณาลองใหม่อีกครั้งภายหลัง</p>
+        )}
+        <button
+          type="submit"
+          disabled={isPending || invalidClosing || stations.length === 0 || entryLocked}
+          className="btn-primary w-full sm:w-auto"
+        >
           {isPending ? 'กำลังบันทึก...' : 'บันทึกการใช้น้ำมัน'}
         </button>
       </form>
