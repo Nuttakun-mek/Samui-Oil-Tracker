@@ -1,6 +1,6 @@
 {
   "name": "oil-tracker-3-islands",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
