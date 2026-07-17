@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Paperclip } from 'lucide-react';
 import { STATION_LABEL, computeClosing, fuelRecordEntrySchema, type FuelRecordFormValues, type Station } from '@/lib/types/domain';
 import { DatePicker } from '@/components/ui/date-picker';
+import { NumberInput } from '@/components/ui/number-input';
 import { uploadRecordDocument } from '../documents/actions';
 import { upsertFuelRecord, getPreviousClosing } from './actions';
 
@@ -18,7 +19,9 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
   const [previousSameDay, setPreviousSameDay] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
-  const defaultStationId = stations[0]?.id ?? 'samui';
+  const [openingLoading, setOpeningLoading] = useState(false);
+  // บัญชีที่ลงได้หลายพื้นที่ต้องเลือกเองก่อน (กันลงผิดสถานี) — บัญชีพื้นที่เดียวล็อกให้อัตโนมัติ
+  const defaultStationId = stations.length === 1 ? stations[0].id : ('' as unknown as Station['id']);
 
   const {
     register,
@@ -37,6 +40,8 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
       received_liters: 0,
       plan_received_liters: 0,
       dispatched_liters: 0,
+      dispatched_namsaeng: 0,
+      dispatched_kfp: 0,
       employee_code: '',
       vehicle_plate: '',
       reference_document_no: '',
@@ -62,11 +67,14 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
   // autofill "ยอดยกมา" จากยอดคงเหลือล่าสุด (รวมเที่ยวก่อนหน้าของวันเดียวกัน)
   const refreshOpening = useCallback(() => {
     if (!station || !recordDate) return;
-    getPreviousClosing(station, recordDate).then((previous) => {
-      setValue('opening_liters', previous.closing);
-      setPreviousDate(previous.recordDate);
-      setPreviousSameDay(previous.sameDay);
-    });
+    setOpeningLoading(true);
+    getPreviousClosing(station, recordDate)
+      .then((previous) => {
+        setValue('opening_liters', previous.closing);
+        setPreviousDate(previous.recordDate);
+        setPreviousSameDay(previous.sameDay);
+      })
+      .finally(() => setOpeningLoading(false));
   }, [station, recordDate, setValue]);
 
   useEffect(() => {
@@ -150,13 +158,21 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
                 <p className="mt-1 text-xs font-semibold text-brand-700">ล็อกตามสิทธิ์ของบัญชีผู้ใช้</p>
               </>
             ) : (
-              <select {...register('station_id')} className="field">
-                {stations.map(({ id }) => (
-                  <option key={id} value={id}>
-                    {STATION_LABEL[id]}
+              <>
+                <select {...register('station_id')} className="field" defaultValue="">
+                  <option value="" disabled>
+                    โปรดเลือกพื้นที่ในการลงข้อมูล
                   </option>
-                ))}
-              </select>
+                  {stations.map(({ id }) => (
+                    <option key={id} value={id}>
+                      {STATION_LABEL[id]}
+                    </option>
+                  ))}
+                </select>
+                {errors.station_id && (
+                  <p className="mt-1 text-xs font-semibold text-red-600">โปรดเลือกพื้นที่ในการลงข้อมูล</p>
+                )}
+              </>
             )}
           </div>
           <div>
@@ -195,28 +211,44 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
               {opening.toLocaleString('th-TH', { maximumFractionDigits: 1 })} ลิตร
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              {previousDate
-                ? previousSameDay
-                  ? 'ยกยอดต่อจากเที่ยวล่าสุดของวันเดียวกัน'
-                  : `จากยอดปิดวันที่ ${previousDate}`
-                : 'ไม่พบยอดปิดก่อนหน้า'}
+              {!station
+                ? 'เลือกพื้นที่ก่อน ระบบจะดึงยอดยกมาให้อัตโนมัติ'
+                : openingLoading
+                  ? 'กำลังดึงยอดคงเหลือล่าสุด...'
+                  : previousDate
+                    ? previousSameDay
+                      ? 'ยกยอดต่อจากเที่ยวล่าสุดของวันเดียวกัน'
+                      : `จากยอดปิดวันที่ ${previousDate}`
+                    : 'ไม่พบยอดปิดก่อนหน้า'}
             </p>
           </div>
           <div>
             <label className="field-label">รับน้ำมันจริง (ลิตร)</label>
-            <input type="number" step="0.1" {...register('received_liters')} className="field" />
+            <Controller
+              control={control}
+              name="received_liters"
+              render={({ field }) => <NumberInput value={asNumber(field.value)} onChange={field.onChange} />}
+            />
           </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="field-label">แผนรับน้ำมัน (ลิตร)</label>
-            <input type="number" step="0.1" {...register('plan_received_liters')} className="field" />
+            <Controller
+              control={control}
+              name="plan_received_liters"
+              render={({ field }) => <NumberInput value={asNumber(field.value)} onChange={field.onChange} />}
+            />
           </div>
           {!isTao && (
             <div>
               <label className="field-label">ยอดจ่ายน้ำมันรวม (ลิตร)</label>
-              <input type="number" step="0.1" {...register('dispatched_liters')} className="field" />
+              <Controller
+                control={control}
+                name="dispatched_liters"
+                render={({ field }) => <NumberInput value={asNumber(field.value)} onChange={field.onChange} />}
+              />
             </div>
           )}
         </div>
@@ -225,11 +257,19 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="field-label">จ่ายน้ำมันนำแสง (ลิตร)</label>
-              <input type="number" step="0.1" {...register('dispatched_namsaeng')} className="field" />
+              <Controller
+                control={control}
+                name="dispatched_namsaeng"
+                render={({ field }) => <NumberInput value={asNumber(field.value)} onChange={field.onChange} />}
+              />
             </div>
             <div>
               <label className="field-label">จ่ายน้ำมันเครื่อง กฟภ. (ลิตร)</label>
-              <input type="number" step="0.1" {...register('dispatched_kfp')} className="field" />
+              <Controller
+                control={control}
+                name="dispatched_kfp"
+                render={({ field }) => <NumberInput value={asNumber(field.value)} onChange={field.onChange} />}
+              />
             </div>
           </div>
         )}
