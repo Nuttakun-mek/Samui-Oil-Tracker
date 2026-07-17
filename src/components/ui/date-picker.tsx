@@ -84,6 +84,9 @@ export function DatePicker({
         <div className="absolute z-50 mt-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
           <DayPicker
             mode="single"
+            // ต้องแสดงวันของเดือนก่อน/ถัดไป (สีจาง) เพื่อให้ช่องสัปดาห์แรกครบ 7 ช่อง —
+            // ไม่งั้นวันที่ 1 จะเลื่อนไปอยู่คอลัมน์อาทิตย์เสมอ ทำให้วัน-วันที่ไม่ตรงตามจริง
+            showOutsideDays
             selected={fromIsoDate(value)}
             defaultMonth={openAtMonth}
             onSelect={(date) => {

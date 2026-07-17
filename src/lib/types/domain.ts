@@ -79,6 +79,25 @@ export const fuelRecordFormSchema = z
 
 export type FuelRecordFormValues = z.infer<typeof fuelRecordFormSchema>;
 
+// กติกาเข้มสำหรับ "ฟอร์มบันทึกรายวัน" เท่านั้น (การแก้ไขข้อมูลย้อนหลัง/นำเข้าใช้กติกาพื้นฐานข้างบน
+// เพราะข้อมูลเก่าอาจไม่มีทะเบียนรถ/รหัสพนักงาน 6 หลักให้ครบ)
+export const fuelRecordEntrySchema = fuelRecordFormSchema.superRefine((data, ctx) => {
+  if (!/^\d{6}$/.test(data.employee_code)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['employee_code'], message: 'รหัสพนักงานต้องเป็นตัวเลข 6 หลัก' });
+  }
+  if (data.received_liters > 0) {
+    if (!data.vehicle_plate?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['vehicle_plate'], message: 'ต้องระบุทะเบียนรถส่งน้ำมันเมื่อมีการรับน้ำมัน' });
+    }
+    if (!data.reference_document_no?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['reference_document_no'], message: 'ต้องระบุเลขใบส่งของ / PO เมื่อมีการรับน้ำมัน' });
+    }
+    if (!data.contract_code?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['contract_code'], message: 'ต้องระบุรหัสสัญญาเมื่อมีการรับน้ำมัน' });
+    }
+  }
+});
+
 export function computeClosing(values: {
   station_id: StationId;
   opening_liters: number;
@@ -87,9 +106,14 @@ export function computeClosing(values: {
   dispatched_namsaeng?: number;
   dispatched_kfp?: number;
 }) {
+  // บังคับเป็นตัวเลขเสมอ — ค่าจาก input ฟอร์มเป็น string ("10" + "100" เคยกลายเป็น "10100")
+  const num = (value: number | undefined) => {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
   const dispatched =
     values.station_id === 'koh_tao'
-      ? (values.dispatched_namsaeng ?? 0) + (values.dispatched_kfp ?? 0)
-      : values.dispatched_liters;
-  return values.opening_liters + values.received_liters - dispatched;
+      ? num(values.dispatched_namsaeng) + num(values.dispatched_kfp)
+      : num(values.dispatched_liters);
+  return num(values.opening_liters) + num(values.received_liters) - dispatched;
 }

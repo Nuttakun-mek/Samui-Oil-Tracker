@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Paperclip } from 'lucide-react';
-import { STATION_LABEL, computeClosing, fuelRecordFormSchema, type FuelRecordFormValues, type Station } from '@/lib/types/domain';
+import { STATION_LABEL, computeClosing, fuelRecordEntrySchema, type FuelRecordFormValues, type Station } from '@/lib/types/domain';
 import { DatePicker } from '@/components/ui/date-picker';
 import { uploadRecordDocument } from '../documents/actions';
 import { upsertFuelRecord, getPreviousClosing } from './actions';
@@ -29,7 +29,7 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
     control,
     formState: { errors },
   } = useForm<FuelRecordFormValues>({
-    resolver: zodResolver(fuelRecordFormSchema),
+    resolver: zodResolver(fuelRecordEntrySchema),
     defaultValues: {
       station_id: defaultStationId,
       record_date: today(),
@@ -47,11 +47,16 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
 
   const station = watch('station_id');
   const isTao = station === 'koh_tao';
-  const opening = watch('opening_liters') || 0;
-  const received = watch('received_liters') || 0;
-  const dispatched = watch('dispatched_liters') || 0;
-  const namsaeng = watch('dispatched_namsaeng') || 0;
-  const kfp = watch('dispatched_kfp') || 0;
+  // ค่าจาก input เป็น string เสมอ — ต้องแปลงเป็นตัวเลขก่อนคำนวณ ไม่งั้น "10"+"100" กลายเป็น 10100
+  const asNumber = (value: unknown) => {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const opening = asNumber(watch('opening_liters'));
+  const received = asNumber(watch('received_liters'));
+  const dispatched = asNumber(watch('dispatched_liters'));
+  const namsaeng = asNumber(watch('dispatched_namsaeng'));
+  const kfp = asNumber(watch('dispatched_kfp'));
   const recordDate = watch('record_date');
 
   // autofill "ยอดยกมา" จากยอดคงเหลือล่าสุด (รวมเที่ยวก่อนหน้าของวันเดียวกัน)
@@ -168,9 +173,11 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
           <label className="field-label">รหัสพนักงานผู้รายงาน</label>
           <input
             type="text"
+            inputMode="numeric"
+            maxLength={6}
             {...register('employee_code')}
             className="field"
-            placeholder="เช่น 123456"
+            placeholder="ตัวเลข 6 หลัก เช่น 123456"
             autoComplete="off"
           />
           {errors.employee_code && <p className="mt-1 text-xs font-semibold text-red-600">{errors.employee_code.message}</p>}
@@ -180,9 +187,9 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
           <div>
             <label className="field-label flex items-center justify-between gap-2">
               <span>ยอดยกมา (ลิตร)</span>
-              <span className="text-xs font-normal text-slate-500">อัตโนมัติ</span>
+              <span className="text-xs font-normal text-slate-500">อัตโนมัติ · แก้ไขไม่ได้</span>
             </label>
-            <input type="number" step="0.1" {...register('opening_liters')} className="field" />
+            <input type="number" step="0.1" readOnly aria-readonly="true" {...register('opening_liters')} className="field cursor-not-allowed bg-slate-50 text-slate-700" />
             <p className="mt-1 text-xs text-slate-500">
               {previousDate
                 ? previousSameDay
@@ -246,15 +253,18 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className="field-label">ทะเบียนรถส่งน้ำมัน</label>
-            <input type="text" {...register('vehicle_plate')} className="field" placeholder="ถ้ามี" />
+            <input type="text" {...register('vehicle_plate')} className="field" placeholder={received > 0 ? 'ต้องระบุ' : 'ระบุเมื่อมีการรับน้ำมัน'} />
+            {errors.vehicle_plate && <p className="mt-1 text-xs font-semibold text-red-600">{errors.vehicle_plate.message}</p>}
           </div>
           <div>
             <label className="field-label">เลขใบส่งของ / PO</label>
-            <input type="text" {...register('reference_document_no')} className="field" placeholder="ถ้ามี" />
+            <input type="text" {...register('reference_document_no')} className="field" placeholder={received > 0 ? 'ต้องระบุ' : 'ระบุเมื่อมีการรับน้ำมัน'} />
+            {errors.reference_document_no && <p className="mt-1 text-xs font-semibold text-red-600">{errors.reference_document_no.message}</p>}
           </div>
           <div>
             <label className="field-label">รหัสสัญญา</label>
-            <input type="text" {...register('contract_code')} className="field" placeholder="เช่น ช.034/2569" />
+            <input type="text" {...register('contract_code')} className="field" placeholder={received > 0 ? 'ต้องระบุ เช่น ช.034/2569' : 'ระบุเมื่อมีการรับน้ำมัน'} />
+            {errors.contract_code && <p className="mt-1 text-xs font-semibold text-red-600">{errors.contract_code.message}</p>}
           </div>
         </div>
 

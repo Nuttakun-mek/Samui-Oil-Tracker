@@ -3,13 +3,14 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { computeClosing, fuelRecordFormSchema, type FuelRecordFormValues } from '@/lib/types/domain';
+import { computeClosing, fuelRecordEntrySchema, fuelRecordFormSchema, type FuelRecordFormValues } from '@/lib/types/domain';
 import { getCurrentUserAccess, requireAdmin, requirePageAccess } from '@/lib/auth/server';
 
 export async function upsertFuelRecord(raw: FuelRecordFormValues) {
   await requirePageAccess('entry');
 
-  const parsed = fuelRecordFormSchema.safeParse(raw);
+  // ฟอร์มรายวันใช้กติกาเข้ม (รหัสพนักงาน 6 หลัก, ข้อมูลรถ/ใบส่งของ/สัญญาบังคับเมื่อรับน้ำมัน)
+  const parsed = fuelRecordEntrySchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' };
   }
