@@ -36,6 +36,13 @@ export function formatThaiDateCompact(isoDate: string) {
   return `${day} ${THAI_MONTHS_SHORT[month - 1]} ${year + 543}`;
 }
 
+// เวลา HH:mm ตามโซนเวลาไทย ใช้แยกหลายเที่ยวส่งของในวันเดียวกัน (เช่นในตาราง PDF)
+export function formatThaiTimeShort(isoTimestamp: string) {
+  const date = new Date(isoTimestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' });
+}
+
 export function formatThaiMonth(monthKey: string) {
   const [year, month] = monthKey.split('-').map(Number);
   if (!year || !month) return monthKey;

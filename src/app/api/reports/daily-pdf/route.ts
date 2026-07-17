@@ -6,6 +6,7 @@ import { createDailyFuelPdf } from '@/lib/reports/daily-fuel-pdf';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { STATION_IDS, type FuelRecord, type Station, type StationId } from '@/lib/types/domain';
+import { getProcurementSummary } from '@/lib/procurement';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,15 +37,18 @@ export async function GET(request: NextRequest) {
   const stationIds = requestedStation && visibleStationIds.includes(requestedStation as StationId)
     ? [requestedStation as StationId]
     : visibleStationIds;
-  const [{ data: stations }, { data: records, error }] = await Promise.all([
+  const forceDailyChart = request.nextUrl.searchParams.get('chartMode') === 'daily';
+
+  const [{ data: stations }, { data: records, error }, procurement] = await Promise.all([
     supabase.from('stations').select('*').in('id', stationIds).order('name'),
     supabase.from('fuel_records').select('*').in('station_id', stationIds).gte('record_date', from).lte('record_date', to).order('record_date').order('created_at').order('station_id'),
+    getProcurementSummary(),
   ]);
   if (error) return new Response(error.message, { status: 500 });
 
   try {
     const thaiFont = await readFile(path.join(process.cwd(), 'public', 'fonts', 'Sarabun-Regular.ttf'));
-    const pdf = await createDailyFuelPdf((stations ?? []) as Station[], (records ?? []) as FuelRecord[], from, to, thaiFont);
+    const pdf = await createDailyFuelPdf((stations ?? []) as Station[], (records ?? []) as FuelRecord[], from, to, thaiFont, { forceDailyChart, procurement });
     const scope = stationIds.length === 1 ? stationIds[0] : 'all-stations';
     return new Response(new Uint8Array(pdf), {
       headers: {

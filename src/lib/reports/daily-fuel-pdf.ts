@@ -1,8 +1,16 @@
 import PDFDocument from 'pdfkit';
-import { formatThaiDate, formatThaiDateShort } from '@/lib/format/thai-date';
+import { formatThaiDate, formatThaiDateShort, formatThaiTimeShort } from '@/lib/format/thai-date';
 import { STATION_IDS, STATION_LABEL, type FuelRecord, type Station } from '@/lib/types/domain';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
-import { buildTrendBuckets, computeStationInsights, findAnomalies, suggestPeriodMode, type StationInsight } from '@/lib/analytics/station-insight';
+import {
+  buildTrendBuckets,
+  computeStationInsights,
+  findAnomalies,
+  suggestPeriodMode,
+  type PeriodMode,
+  type StationInsight,
+} from '@/lib/analytics/station-insight';
+import type { ProcurementSummary } from '@/lib/procurement';
 import { drawTrendChart } from './pdf-chart';
 import { APP_RELEASE } from '@/lib/app-version';
 
@@ -14,7 +22,7 @@ const CONTENT_BOTTOM = PAGE_HEIGHT - MARGIN - 16;
 
 type Column = { label: string; width: number; align?: 'left' | 'right' };
 const COLUMNS: Column[] = [
-  { label: 'วันที่', width: 66 },
+  { label: 'วันที่', width: 88 },
   { label: 'ยกมา', width: 82, align: 'right' },
   { label: 'รับเข้า', width: 78, align: 'right' },
   { label: 'พร้อมใช้', width: 82, align: 'right' },
@@ -22,7 +30,7 @@ const COLUMNS: Column[] = [
   { label: 'คงเหลือ', width: 82, align: 'right' },
   { label: 'ค่าใช้จ่าย', width: 92, align: 'right' },
   { label: 'ผู้รายงาน', width: 82 },
-  { label: 'แหล่งข้อมูล', width: TABLE_WIDTH - 642 },
+  { label: 'แหล่งข้อมูล', width: TABLE_WIDTH - 664 },
 ];
 
 const STATUS_LABEL: Record<StationInsight['status'], string> = { danger: 'วิกฤต', warn: 'เฝ้าระวัง', ok: 'ปกติ' };
@@ -36,6 +44,16 @@ function sourceLabel(source: FuelRecord['record_source']) {
   if (source === 'database') return 'ฐานข้อมูลย้อนหลัง';
   if (source === 'upload') return 'อัปโหลดไฟล์';
   return 'พนักงานกรอก';
+}
+
+// ระบุชัดว่า "ใช้ได้อีก N วัน" นับถึง Safety Stock ที่ต้องกันสำรองไว้ หรือนับถึงถังหมดจริง (เมื่อสถานีนั้นไม่ได้ตั้ง Safety Stock)
+function safetyStockNote(item: StationInsight) {
+  return item.safetyStock > 0 ? `นับถึง Safety Stock ${number(item.safetyStock)} ล.` : 'นับถึงถังหมด (ไม่ได้ตั้ง Safety Stock)';
+}
+
+export interface DailyFuelPdfOptions {
+  forceDailyChart?: boolean;
+  procurement?: ProcurementSummary;
 }
 
 function buildInsightBullets(stations: Station[], insights: StationInsight[], anomalyCount: number, budget: number) {
@@ -52,11 +70,11 @@ function buildInsightBullets(stations: Station[], insights: StationInsight[], an
   withData.forEach((item) => {
     if (item.status === 'danger' && item.etaDate) {
       bullets.push(
-        `${STATION_LABEL[item.station.id]} คาดว่าน้ำมันจะเพียงพอถึงวันที่ ${formatThaiDate(item.etaDate)} เท่านั้น (เหลือ ${item.daysRemaining?.toFixed(1)} วัน ต่ำกว่าเกณฑ์เฝ้าระวัง ${item.station.low_stock_days} วัน) ควรวางแผนจัดส่งเพิ่มโดยเร็ว`
+        `${STATION_LABEL[item.station.id]} คาดว่าน้ำมันจะเพียงพอถึงวันที่ ${formatThaiDate(item.etaDate)} เท่านั้น (เหลือ ${item.daysRemaining?.toFixed(1)} วัน ต่ำกว่าเกณฑ์เฝ้าระวัง ${item.station.low_stock_days} วัน · ${safetyStockNote(item)}) ควรวางแผนจัดส่งเพิ่มโดยเร็ว`
       );
     } else if (item.status === 'warn' && item.etaDate) {
       bullets.push(
-        `${STATION_LABEL[item.station.id]} เข้าเกณฑ์เฝ้าระวัง คาดใช้ได้อีก ${item.daysRemaining?.toFixed(1)} วัน (ถึงวันที่ ${formatThaiDate(item.etaDate)})`
+        `${STATION_LABEL[item.station.id]} เข้าเกณฑ์เฝ้าระวัง คาดใช้ได้อีก ${item.daysRemaining?.toFixed(1)} วัน (ถึงวันที่ ${formatThaiDate(item.etaDate)} · ${safetyStockNote(item)})`
       );
     }
   });
@@ -85,7 +103,14 @@ function buildInsightBullets(stations: Station[], insights: StationInsight[], an
   return bullets.slice(0, 8);
 }
 
-function drawExecutiveSummary(doc: InstanceType<typeof PDFDocument>, stations: Station[], records: FuelRecord[], from: string, to: string) {
+function drawExecutiveSummary(
+  doc: InstanceType<typeof PDFDocument>,
+  stations: Station[],
+  records: FuelRecord[],
+  from: string,
+  to: string,
+  periodMode: PeriodMode
+) {
   doc.fillColor('#0f172a').fontSize(18).text('รายงานสรุปภาพรวมการใช้น้ำมัน', MARGIN, MARGIN);
   const scopeLabel = stations.length === 1 ? STATION_LABEL[stations[0].id] : 'ทุกพื้นที่';
   doc.fontSize(10).fillColor('#475569').text(`${formatThaiDate(from)} ถึง ${formatThaiDate(to)}  ·  ขอบเขต: ${scopeLabel}`, MARGIN, MARGIN + 24);
@@ -117,7 +142,6 @@ function drawExecutiveSummary(doc: InstanceType<typeof PDFDocument>, stations: S
 
   const chartY = kpiY + kpiHeight + 22;
   const chartHeight = 168;
-  const periodMode = suggestPeriodMode(from, to);
   const buckets = buildTrendBuckets(records, periodMode);
   drawTrendChart(doc, { x: MARGIN, y: chartY, width: TABLE_WIDTH, height: chartHeight }, buckets);
 
@@ -134,7 +158,9 @@ function drawExecutiveSummary(doc: InstanceType<typeof PDFDocument>, stations: S
     doc.fontSize(7.5).fillColor('#334155').text(
       [
         `คงเหลือ ${number(item.closing)} ลิตร`,
-        item.daysRemaining !== null ? `ใช้ได้อีก ${item.daysRemaining.toFixed(1)} วัน${item.etaDate ? ` (ถึง ${formatThaiDate(item.etaDate)})` : ''}` : 'ยังไม่มีข้อมูลพอประเมิน',
+        item.daysRemaining !== null
+          ? `ใช้ได้อีก ${item.daysRemaining.toFixed(1)} วัน${item.etaDate ? ` (ถึง ${formatThaiDate(item.etaDate)})` : ''} · ${item.safetyStock > 0 ? 'ถึง Safety Stock' : 'ถึงถังหมด'}`
+          : 'ยังไม่มีข้อมูลพอประเมิน',
         `งบประมาณ ${item.budget.toLocaleString('th-TH', { maximumFractionDigits: 0 })} บาท`,
         item.trendPct !== null ? `แนวโน้ม 7 รายการล่าสุด ${item.trendPct > 0 ? '+' : ''}${item.trendPct.toFixed(1)}%` : '',
       ]
@@ -159,7 +185,91 @@ function drawExecutiveSummary(doc: InstanceType<typeof PDFDocument>, stations: S
   }
 }
 
-export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], from: string, to: string, thaiFont: Buffer) {
+function drawProcurementPage(doc: InstanceType<typeof PDFDocument>, procurement: ProcurementSummary) {
+  doc.fillColor('#0f172a').fontSize(18).text('คงเหลือจากสัญญาซื้อล๊อตใหญ่', MARGIN, MARGIN);
+  doc.fontSize(9).fillColor('#475569').text('ยอดคงเหลือปัจจุบัน ณ วันที่สร้างรายงาน — เป็นยอดสะสมของกลุ่ม ไม่ผูกกับช่วงวันที่ของรายงานนี้', MARGIN, MARGIN + 24);
+
+  const groups = procurement.groups;
+  const colGap = 14;
+  const colWidth = (TABLE_WIDTH - colGap * (groups.length - 1)) / Math.max(groups.length, 1);
+  const cardY = MARGIN + 56;
+  const cardHeight = 118;
+
+  groups.forEach((group, index) => {
+    const cardX = MARGIN + index * (colWidth + colGap);
+
+    if (!group.baseline) {
+      doc.roundedRect(cardX, cardY, colWidth, cardHeight, 4).fillAndStroke('#f8fafc', '#e2e8f0');
+      doc.fontSize(11).fillColor('#0f172a').text(group.label, cardX + 12, cardY + 10, { width: colWidth - 24 });
+      doc.fontSize(8).fillColor('#64748b').text(group.detail, cardX + 12, cardY + 27, { width: colWidth - 24 });
+      doc.fontSize(9).fillColor('#a16207').text('ยังไม่ได้ตั้งยอดคงเหลือเริ่มต้น (Settings → จัดซื้อล๊อตใหญ่)', cardX + 12, cardY + 48, { width: colWidth - 24 });
+      return;
+    }
+
+    const tone = group.isLow ? '#b91c1c' : '#722257';
+    doc.roundedRect(cardX, cardY, colWidth, cardHeight, 4).fillAndStroke('#ffffff', tone);
+    doc.fontSize(11).fillColor('#0f172a').text(group.label, cardX + 12, cardY + 10, { width: colWidth - 100 });
+    doc.fontSize(8).fillColor('#64748b').text(group.detail, cardX + 12, cardY + 27, { width: colWidth - 100 });
+    if (group.isLow) {
+      doc.roundedRect(cardX + colWidth - 84, cardY + 10, 72, 18, 4).fillAndStroke('#fef2f2', '#b91c1c');
+      doc.fontSize(7.5).fillColor('#b91c1c').text('ใกล้หมดล๊อต', cardX + colWidth - 84, cardY + 15, { width: 72, align: 'center' });
+    }
+    doc.fontSize(20).fillColor(group.isLow ? '#b91c1c' : '#0f172a').text(`${number(group.balance ?? 0)} ลิตร`, cardX + 12, cardY + 44);
+    doc.fontSize(7.5).fillColor('#475569').text(
+      [
+        `ยอดเริ่มต้น ${number(group.baseline.liters)} ลิตร (${formatThaiDate(group.baseline.date)})`,
+        `+ เติมล๊อต ${group.contractsCount.toLocaleString('th-TH')} ครั้ง รวม ${number(group.contractsSum)} ลิตร`,
+        `− รับเข้าแล้ว ${number(group.receivedSum)} ลิตร`,
+      ].join('\n'),
+      cardX + 12,
+      cardY + 70,
+      { width: colWidth - 24, lineGap: 2 }
+    );
+
+    const tableY = cardY + cardHeight + 12;
+    doc.fontSize(9).fillColor('#0f172a').text('ล็อตที่เติมล่าสุด', cardX, tableY);
+    const lotColumns: Column[] = [
+      { label: 'วันที่', width: colWidth * 0.28 },
+      { label: 'รหัสสัญญา', width: colWidth * 0.42 },
+      { label: 'ปริมาณ (ลิตร)', width: colWidth - colWidth * 0.28 - colWidth * 0.42, align: 'right' },
+    ];
+    const rowHeight = 14;
+    const maxRows = 15;
+    const shownLots = group.contracts.slice(0, maxRows);
+    let ly = tableY + 16;
+    doc.fontSize(7).fillColor('#334155');
+    let lx = cardX;
+    lotColumns.forEach((column) => {
+      doc.text(column.label, lx + 2, ly, { width: column.width - 4, align: column.align ?? 'left', lineBreak: false });
+      lx += column.width;
+    });
+    ly += rowHeight;
+    doc.fontSize(7.3).fillColor('#1e293b');
+    shownLots.forEach((lot) => {
+      let cx = cardX;
+      const rowValues = [lot.contractDate ? formatThaiDateShort(lot.contractDate) : '-', lot.contractCode, number(lot.quantityLiters)];
+      lotColumns.forEach((column, columnIndex) => {
+        doc.text(rowValues[columnIndex], cx + 2, ly, { width: column.width - 4, align: column.align ?? 'left', ellipsis: true, lineBreak: false });
+        cx += column.width;
+      });
+      ly += rowHeight;
+    });
+    if (group.contracts.length === 0) {
+      doc.fontSize(7.5).fillColor('#94a3b8').text('ยังไม่มีการเติมล๊อตนับจากยอดเริ่มต้น', cardX, ly);
+    } else if (group.contracts.length > maxRows) {
+      doc.fontSize(7).fillColor('#94a3b8').text(`+ อีก ${(group.contracts.length - maxRows).toLocaleString('th-TH')} ล็อต ดูรายละเอียดที่ Settings → จัดซื้อล๊อตใหญ่`, cardX, ly);
+    }
+  });
+}
+
+export function createDailyFuelPdf(
+  stations: Station[],
+  records: FuelRecord[],
+  from: string,
+  to: string,
+  thaiFont: Buffer,
+  options: DailyFuelPdfOptions = {}
+) {
   return new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: MARGIN, bufferPages: true, info: { Title: 'รายงานน้ำมันรายวันทุกพื้นที่' } });
     const chunks: Buffer[] = [];
@@ -169,7 +279,14 @@ export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], f
     doc.registerFont('Thai', thaiFont);
     doc.font('Thai');
 
-    drawExecutiveSummary(doc, stations, records, from, to);
+    const periodMode: PeriodMode = options.forceDailyChart ? 'daily' : suggestPeriodMode(from, to);
+    drawExecutiveSummary(doc, stations, records, from, to, periodMode);
+
+    if (options.procurement) {
+      doc.addPage({ size: 'A4', layout: 'landscape', margin: MARGIN });
+      doc.font('Thai');
+      drawProcurementPage(doc, options.procurement);
+    }
 
     const drawTableHeader = (y: number) => {
       doc.rect(MARGIN, y, TABLE_WIDTH, 22).fill('#0f172a');
@@ -191,11 +308,15 @@ export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], f
       const latestClosing = stationRecords.at(-1)?.closing_liters;
       const insight = computeStationInsights([station], stationRecords)[0];
       const anomalies = findAnomalies([station], stationRecords);
-      const stationBuckets = buildTrendBuckets(stationRecords, suggestPeriodMode(from, to));
+      const stationBuckets = buildTrendBuckets(stationRecords, periodMode);
       const sourceCounts = stationRecords.reduce<Record<FuelRecord['record_source'], number>>(
         (counts, record) => ({ ...counts, [record.record_source]: counts[record.record_source] + 1 }),
         { manual: 0, upload: 0, database: 0 }
       );
+      // นับจำนวนเที่ยวต่อวัน เพื่อกำกับเวลาในตารางเมื่อวันเดียวกันมีมากกว่า 1 รายการ
+      const recordCountByDate = new Map<string, number>();
+      stationRecords.forEach((record) => recordCountByDate.set(record.record_date, (recordCountByDate.get(record.record_date) ?? 0) + 1));
+      const deliveries = stationRecords.filter((record) => record.received_liters > 0);
 
       const drawStationOverview = () => {
         doc.addPage({ size: 'A4', layout: 'landscape', margin: MARGIN });
@@ -242,7 +363,7 @@ export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], f
             ? 'ข้อมูลยังไม่เพียงพอสำหรับเปรียบเทียบแนวโน้ม 7 รายการล่าสุด'
             : `แนวโน้มการใช้ 7 รายการล่าสุด${insight.trendPct >= 0 ? 'เพิ่มขึ้น' : 'ลดลง'} ${Math.abs(insight.trendPct).toFixed(1)}% จากช่วงก่อนหน้า`,
           insight.daysRemaining !== null && insight.etaDate
-            ? `คาดว่าใช้ได้อีก ${insight.daysRemaining.toFixed(1)} วัน หรือถึงประมาณ ${formatThaiDate(insight.etaDate)}`
+            ? `คาดว่าใช้ได้อีก ${insight.daysRemaining.toFixed(1)} วัน หรือถึงประมาณ ${formatThaiDate(insight.etaDate)} (${safetyStockNote(insight)})`
             : 'ยังประเมินจำนวนวันที่ใช้ได้ไม่เพียงพอ',
           anomalies.length
             ? `พบวันที่ใช้น้ำมันสูงผิดปกติ ${anomalies.length.toLocaleString('th-TH')} วัน (มากกว่า 2 เท่าของค่าเฉลี่ย)`
@@ -270,6 +391,52 @@ export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], f
           insightY + 27,
           { width: TABLE_WIDTH * 0.3 - 18, lineGap: 2 }
         );
+
+        const deliveryY = insightY + 90 + 14;
+        doc.fontSize(10).fillColor('#0f172a').text(`ประวัติรับน้ำมัน (ทะเบียนรถ / เลขใบส่งของ-PO / รหัสสัญญา) — ทั้งหมด ${deliveries.length.toLocaleString('th-TH')} เที่ยว`, MARGIN, deliveryY);
+        const deliveryColumns: Column[] = [
+          { label: 'วันที่/เวลา', width: 92 },
+          { label: 'ปริมาณ (ลิตร)', width: 78, align: 'right' },
+          { label: 'ทะเบียนรถ', width: 110 },
+          { label: 'เลขใบส่งของ / PO', width: 170 },
+          { label: 'รหัสสัญญา', width: TABLE_WIDTH - 450 },
+        ];
+        const deliveryHeaderY = deliveryY + 16;
+        if (deliveries.length === 0) {
+          doc.fontSize(8).fillColor('#94a3b8').text('ไม่มีข้อมูลการรับน้ำมันในช่วงที่เลือก', MARGIN, deliveryHeaderY);
+        } else {
+          doc.rect(MARGIN, deliveryHeaderY, TABLE_WIDTH, 15).fill('#f1f5f9');
+          let dx = MARGIN;
+          doc.fillColor('#334155').fontSize(7);
+          deliveryColumns.forEach((column) => {
+            doc.text(column.label, dx + 4, deliveryHeaderY + 4, { width: column.width - 8, align: column.align ?? 'left', lineBreak: false });
+            dx += column.width;
+          });
+          const rowHeight = 12;
+          const maxRows = 5;
+          const shown = deliveries.slice(-maxRows).reverse();
+          shown.forEach((record, index) => {
+            const rowY = deliveryHeaderY + 15 + index * rowHeight;
+            const hasTime = (recordCountByDate.get(record.record_date) ?? 0) > 1;
+            const values = [
+              hasTime ? `${formatThaiDateShort(record.record_date)} ${formatThaiTimeShort(record.created_at)}` : formatThaiDateShort(record.record_date),
+              number(record.received_liters),
+              record.vehicle_plate || '-',
+              record.reference_document_no || '-',
+              record.contract_code || '-',
+            ];
+            let cx = MARGIN;
+            doc.fillColor('#1e293b').fontSize(7.2);
+            deliveryColumns.forEach((column, columnIndex) => {
+              doc.text(values[columnIndex], cx + 4, rowY + 2, { width: column.width - 8, align: column.align ?? 'left', ellipsis: true, lineBreak: false });
+              cx += column.width;
+            });
+          });
+          const remaining = deliveries.length - shown.length;
+          if (remaining > 0) {
+            doc.fontSize(7).fillColor('#94a3b8').text(`+ อีก ${remaining.toLocaleString('th-TH')} เที่ยว ดูรายละเอียดในตารางถัดไป`, MARGIN, deliveryHeaderY + 15 + shown.length * rowHeight + 2);
+          }
+        }
       };
 
       const drawStationHeading = (continued = false) => {
@@ -298,8 +465,9 @@ export function createDailyFuelPdf(stations: Station[], records: FuelRecord[], f
         }
 
         if (index % 2 === 1) doc.rect(MARGIN, y, TABLE_WIDTH, rowHeight).fill('#f8fafc');
+        const hasMultipleTrips = (recordCountByDate.get(record.record_date) ?? 0) > 1;
         const values = [
-          formatThaiDateShort(record.record_date),
+          hasMultipleTrips ? `${formatThaiDateShort(record.record_date)} ${formatThaiTimeShort(record.created_at)}` : formatThaiDateShort(record.record_date),
           number(record.opening_liters),
           number(record.received_liters),
           number(record.opening_liters + record.received_liters),
