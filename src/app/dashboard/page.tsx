@@ -165,6 +165,39 @@ export default async function DashboardPage() {
       </div>
       </section>
 
+      <section>
+        <div className="mb-3">
+          <h2 className="text-lg font-extrabold text-slate-950">ยอดสะสมตลอดช่วงข้อมูล</h2>
+          <p className="text-sm text-slate-600">รับเข้าและใช้ออกสะสมของแต่ละพื้นที่ ตั้งแต่วันแรกที่มีข้อมูลตั้งต้นจนถึงวันล่าสุด</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {stationSummaries.map((summary) => (
+            <div key={summary.station.id} className="panel border-t-4 border-t-brand-600">
+              <div className="text-sm font-extrabold text-slate-950">{summary.station.name}</div>
+              <div className="mt-0.5 text-xs text-slate-500">
+                ข้อมูล {summary.firstDate} ถึง {summary.lastDate} · {summary.records.length.toLocaleString('th-TH')} รายการ
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-md bg-emerald-50 px-3 py-2.5">
+                  <div className="text-xs font-bold text-emerald-700">รับเข้าสะสม</div>
+                  <div className="mt-0.5 text-xl font-extrabold tabular-nums text-emerald-800">
+                    {Math.round(summary.receivedTotal).toLocaleString('th-TH')}
+                    <small className="ml-1 text-xs font-semibold text-emerald-700">ลิตร</small>
+                  </div>
+                </div>
+                <div className="rounded-md bg-amber-50 px-3 py-2.5">
+                  <div className="text-xs font-bold text-amber-700">ใช้ออกสะสม</div>
+                  <div className="mt-0.5 text-xl font-extrabold tabular-nums text-amber-800">
+                    {Math.round(summary.dispatchedTotal).toLocaleString('th-TH')}
+                    <small className="ml-1 text-xs font-semibold text-amber-700">ลิตร</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="คงเหลือรวม 3 พื้นที่"
