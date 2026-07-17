@@ -161,6 +161,7 @@ export default async function DashboardPage() {
               daysRemaining={insight.daysRemaining}
               etaDate={insight.etaDate}
               lowStockDays={st.low_stock_days}
+              safetyStock={insight.safetyStock}
             />
           );
         })}

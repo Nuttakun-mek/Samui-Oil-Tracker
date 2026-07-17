@@ -12,6 +12,8 @@ export interface StationInsight {
   dispatched: number;
   closing: number;
   averageDaily: number;
+  safetyStock: number;
+  belowSafetyStock: boolean;
   daysRemaining: number | null;
   etaDate: string | null;
   trendPct: number | null;
@@ -53,15 +55,19 @@ export function computeStationInsight(
   const recentUsage = latestSevenDays.reduce((sum, day) => sum + (dispatchedByDay.get(day) ?? 0), 0);
   const previousUsage = previousSevenDays.reduce((sum, day) => sum + (dispatchedByDay.get(day) ?? 0), 0);
   const averageDaily = latestSevenDays.length ? recentUsage / latestSevenDays.length : 0;
-  const daysRemaining = averageDaily > 0 && latest ? latest.closing_liters / averageDaily : null;
+  // จำนวนวันคิดจาก "น้ำมันที่ใช้ได้จริง" = คงเหลือ − safety stock (ปริมาณที่ต้องกันสำรองไว้เสมอ)
+  const safetyStock = Number(station.safety_stock_liters ?? 0);
+  const usableLiters = latest ? Math.max(0, latest.closing_liters - safetyStock) : 0;
+  const daysRemaining = averageDaily > 0 && latest ? usableLiters / averageDaily : null;
   const etaDate = daysRemaining !== null && latest ? addDaysIso(latest.record_date, Math.floor(daysRemaining)) : null;
   const trendPct = previousUsage > 0 ? ((recentUsage - previousUsage) / previousUsage) * 100 : null;
   const peak = stationRecords.reduce<FuelRecord | null>(
     (highest, record) => (!highest || record.dispatched_liters > highest.dispatched_liters ? record : highest),
     null
   );
+  const belowSafetyStock = safetyStock > 0 && latest !== null && latest.closing_liters < safetyStock;
   const status: StationStatus =
-    daysRemaining !== null && daysRemaining < station.low_stock_days
+    belowSafetyStock || (daysRemaining !== null && daysRemaining < station.low_stock_days)
       ? 'danger'
       : daysRemaining !== null && daysRemaining < station.low_stock_days * 1.5
         ? 'warn'
@@ -74,6 +80,8 @@ export function computeStationInsight(
     dispatched,
     closing: latest?.closing_liters ?? 0,
     averageDaily,
+    safetyStock,
+    belowSafetyStock,
     daysRemaining,
     etaDate,
     trendPct,

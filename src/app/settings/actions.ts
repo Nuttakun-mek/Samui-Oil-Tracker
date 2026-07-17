@@ -64,24 +64,34 @@ export async function updateStationSettings(formData: FormData) {
   const id = formData.get('id') as string;
   const tank_capacity_liters = Number(formData.get('tank_capacity_liters'));
   const low_stock_days = Number(formData.get('low_stock_days'));
+  const safety_stock_liters = Number(formData.get('safety_stock_liters') ?? 0);
   const fuel_price_per_liter = Number(formData.get('fuel_price_per_liter'));
 
   if (
     !Number.isFinite(tank_capacity_liters) || tank_capacity_liters < 0 ||
     !Number.isFinite(low_stock_days) || low_stock_days < 0 ||
+    !Number.isFinite(safety_stock_liters) || safety_stock_liters < 0 ||
     !Number.isFinite(fuel_price_per_liter) || fuel_price_per_liter < 0
   ) {
     return { ok: false as const, error: 'ค่าตั้งค่าสถานีต้องเป็นตัวเลขตั้งแต่ 0 ขึ้นไป' };
+  }
+  if (safety_stock_liters >= tank_capacity_liters && tank_capacity_liters > 0) {
+    return { ok: false as const, error: 'Safety Stock ต้องน้อยกว่าความจุถัง' };
   }
 
   const supabase = await createClient();
   // RLS (stations_write) จะปฏิเสธถ้าไม่ใช่ admin — ไม่ต้องเช็ค role ซ้ำในโค้ดฝั่งนี้
   const { error } = await supabase
     .from('stations')
-    .update({ tank_capacity_liters, low_stock_days, fuel_price_per_liter })
+    .update({ tank_capacity_liters, low_stock_days, safety_stock_liters, fuel_price_per_liter })
     .eq('id', id);
 
-  if (error) return { ok: false as const, error: error.message };
+  if (error) {
+    const message = error.message.includes('safety_stock_liters')
+      ? 'ฐานข้อมูลยังไม่มีคอลัมน์ Safety Stock — กรุณารัน migration 0019_add_station_safety_stock.sql ใน Supabase SQL Editor ก่อน'
+      : error.message;
+    return { ok: false as const, error: message };
+  }
 
   revalidatePath('/settings');
   revalidatePath('/dashboard');

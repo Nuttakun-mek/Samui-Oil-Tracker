@@ -9,6 +9,7 @@ export function TankGauge({
   daysRemaining,
   etaDate,
   lowStockDays,
+  safetyStock = 0,
 }: {
   label: string;
   liters: number;
@@ -18,10 +19,14 @@ export function TankGauge({
   daysRemaining: number | null;
   etaDate: string | null;
   lowStockDays: number;
+  safetyStock?: number;
 }) {
   const clamped = Math.max(0, Math.min(100, pct));
+  const belowSafetyStock = safetyStock > 0 && liters < safetyStock;
+  const safetyPct = capacity > 0 ? Math.max(0, Math.min(100, (safetyStock / capacity) * 100)) : 0;
   // สีตามสัดส่วนน้ำมันในถัง: มากกว่า 60% เขียว, มากกว่า 40% เหลือง, ต่ำกว่านั้นแดง
-  const status = clamped > 60 ? 'ok' : clamped > 40 ? 'warn' : 'danger';
+  // — แต่ถ้าคงเหลือต่ำกว่า safety stock ให้ถือเป็นวิกฤตทันทีไม่ว่าสัดส่วนเท่าไหร่
+  const status = belowSafetyStock ? 'danger' : clamped > 60 ? 'ok' : clamped > 40 ? 'warn' : 'danger';
   const fillColor = { ok: '#15803D', warn: '#C69214', danger: '#B23A1B' }[status];
   const statusText = { ok: 'ปกติ', warn: 'เฝ้าระวัง', danger: 'วิกฤต' }[status];
   const statusClass = {
@@ -52,12 +57,25 @@ export function TankGauge({
         </div>
       </div>
 
-      <div className="h-3 overflow-hidden rounded-md bg-slate-100">
+      <div className="relative h-3 rounded-md bg-slate-100">
         <div
           className="h-full rounded-md transition-all duration-500"
           style={{ width: `${clamped}%`, background: fillColor }}
         />
+        {safetyPct > 0 && (
+          <div
+            className="absolute -top-0.5 h-4 w-0.5 rounded bg-slate-700"
+            style={{ left: `${safetyPct}%` }}
+            title={`Safety Stock ${Math.round(safetyStock).toLocaleString('th-TH')} ลิตร`}
+          />
+        )}
       </div>
+      {safetyStock > 0 && (
+        <div className={`mt-1.5 text-[11px] font-semibold ${belowSafetyStock ? 'text-red-700' : 'text-slate-500'}`}>
+          Safety Stock {Math.round(safetyStock).toLocaleString('th-TH')} ลิตร
+          {belowSafetyStock && ' — คงเหลือต่ำกว่าเกณฑ์สำรอง!'}
+        </div>
+      )}
 
       <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
         <div>
@@ -67,14 +85,22 @@ export function TankGauge({
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-semibold text-slate-500">คาดว่าใช้ได้อีก</dt>
+          <dt className="text-xs font-semibold text-slate-500">{safetyStock > 0 ? 'ใช้ได้อีกก่อนถึง Safety Stock' : 'คาดว่าใช้ได้อีก'}</dt>
           <dd className={`mt-0.5 text-base font-extrabold tabular-nums ${daysCritical ? 'text-red-700' : 'text-slate-900'}`}>
             {daysRemaining === null ? '-' : daysRemaining.toLocaleString('th-TH', { maximumFractionDigits: 1 })} <span className="text-xs font-semibold text-slate-500">วัน</span>
           </dd>
-          {etaDate && <dd className="mt-0.5 text-xs font-semibold text-slate-500">คาดหมดวันที่ {formatThaiDate(etaDate)}</dd>}
+          {etaDate && (
+            <dd className="mt-0.5 text-xs font-semibold text-slate-500">
+              {safetyStock > 0 ? 'คาดถึงจุดสำรองวันที่' : 'คาดหมดวันที่'} {formatThaiDate(etaDate)}
+            </dd>
+          )}
         </div>
       </dl>
-      <p className="mt-2 text-[11px] leading-4 text-slate-500">คำนวณจากยอดคงเหลือ ÷ ยอดใช้เฉลี่ย 7 วันที่มีบันทึกล่าสุด</p>
+      <p className="mt-2 text-[11px] leading-4 text-slate-500">
+        {safetyStock > 0
+          ? 'คำนวณจาก (คงเหลือ − Safety Stock) ÷ ยอดใช้เฉลี่ย 7 วันที่มีบันทึกล่าสุด'
+          : 'คำนวณจากยอดคงเหลือ ÷ ยอดใช้เฉลี่ย 7 วันที่มีบันทึกล่าสุด'}
+      </p>
     </div>
   );
 }

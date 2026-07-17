@@ -35,6 +35,13 @@ export function StationSettingsForm({ station, isAdmin }: { station: Station; is
         <input name="low_stock_days" type="number" defaultValue={station.low_stock_days} className="field" disabled={!isAdmin} />
       </div>
       <div>
+        <label className="field-label">Safety Stock (ลิตร)</label>
+        <input name="safety_stock_liters" type="number" min="0" step="1" defaultValue={station.safety_stock_liters ?? 0} className="field" disabled={!isAdmin} />
+        <p className="mt-1 text-xs text-slate-500">
+          ปริมาณขั้นต่ำที่ต้องกันสำรองไว้เสมอ — &ldquo;คาดว่าใช้ได้อีกกี่วัน&rdquo; จะนับถึงจุดนี้ ไม่ใช่ถังหมด และเตือนวิกฤตทันทีเมื่อคงเหลือต่ำกว่า
+        </p>
+      </div>
+      <div>
         <label className="field-label">ราคาน้ำมันต่อลิตร (บาท)</label>
         <input name="fuel_price_per_liter" type="number" min="0" step="0.01" defaultValue={station.fuel_price_per_liter} className="field" disabled={!isAdmin} />
         <p className="mt-1 text-xs text-slate-500">ใช้คูณยอดจ่ายออกเพื่อแสดงงบประมาณโดยประมาณ</p>

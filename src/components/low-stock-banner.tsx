@@ -5,7 +5,7 @@ import { formatThaiDate } from '@/lib/format/thai-date';
 import type { StationInsight } from '@/lib/analytics/station-insight';
 
 export function LowStockBanner({ insights }: { insights: StationInsight[] }) {
-  const critical = insights.filter((item) => item.status === 'danger' && item.daysRemaining !== null);
+  const critical = insights.filter((item) => item.status === 'danger' && (item.daysRemaining !== null || item.belowSafetyStock));
   if (!critical.length) return null;
 
   return (
@@ -19,8 +19,12 @@ export function LowStockBanner({ insights }: { insights: StationInsight[] }) {
           <ul className="mt-2 space-y-1 text-sm text-red-700">
             {critical.map((item) => (
               <li key={item.station.id}>
-                <strong>{STATION_LABEL[item.station.id]}</strong> — เหลือใช้ได้อีก {item.daysRemaining?.toFixed(1)} วัน
-                {item.etaDate && ` (คาดหมดวันที่ ${formatThaiDate(item.etaDate)})`}
+                <strong>{STATION_LABEL[item.station.id]}</strong>
+                {item.belowSafetyStock &&
+                  ` — คงเหลือ ${Math.round(item.closing).toLocaleString('th-TH')} ลิตร ต่ำกว่า Safety Stock (${Math.round(item.safetyStock).toLocaleString('th-TH')} ลิตร)`}
+                {item.daysRemaining !== null &&
+                  ` — ${item.safetyStock > 0 ? 'ใช้ได้อีกก่อนถึงจุดสำรอง' : 'เหลือใช้ได้อีก'} ${item.daysRemaining.toFixed(1)} วัน`}
+                {item.etaDate && ` (${item.safetyStock > 0 ? 'คาดถึงจุดสำรองวันที่' : 'คาดหมดวันที่'} ${formatThaiDate(item.etaDate)})`}
               </li>
             ))}
           </ul>

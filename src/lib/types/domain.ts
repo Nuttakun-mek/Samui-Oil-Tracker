@@ -14,6 +14,7 @@ export interface Station {
   name: string;
   tank_capacity_liters: number;
   low_stock_days: number;
+  safety_stock_liters: number;
   fuel_price_per_liter: number;
   has_dispatch_breakdown: boolean;
 }
