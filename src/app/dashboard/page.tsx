@@ -32,7 +32,7 @@ export default async function DashboardPage() {
     const admin = createAdminClient();
     const [{ data: allStations }, { data: allRecords }] = await Promise.all([
       admin.from('stations').select('*').order('id'),
-      admin.from('fuel_records').select('*').order('record_date', { ascending: true }),
+      admin.from('fuel_records').select('*').order('record_date', { ascending: true }).order('created_at', { ascending: true }),
     ]);
     stations = allStations;
     records = allRecords;
@@ -40,7 +40,7 @@ export default async function DashboardPage() {
     const access = await getCurrentUserAccess();
     const [{ data: scopedStations }, { data: scopedRecords }] = await Promise.all([
       supabase.from('stations').select('*').in('id', access.stationIds).order('id'),
-      supabase.from('fuel_records').select('*').in('station_id', access.stationIds).order('record_date', { ascending: true }),
+      supabase.from('fuel_records').select('*').in('station_id', access.stationIds).order('record_date', { ascending: true }).order('created_at', { ascending: true }),
     ]);
     stations = scopedStations;
     records = scopedRecords;

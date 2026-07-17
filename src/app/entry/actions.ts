@@ -41,36 +41,40 @@ export async function upsertFuelRecord(raw: FuelRecordFormValues) {
     return { ok: false as const, error: 'ยอดคงเหลือเกินความจุถังของพื้นที่นี้' };
   }
 
+  // insert เสมอ — 1 วันส่งน้ำมันได้หลายเที่ยว แต่ละเที่ยวเป็น record แยก (migration 0018)
   const { data: saved, error } = await supabase
     .from('fuel_records')
-    .upsert(
-      {
-        station_id: values.station_id,
-        record_date: values.record_date,
-        opening_liters: values.opening_liters,
-        received_liters: values.received_liters,
-        plan_received_liters: values.plan_received_liters ?? 0,
-        dispatched_liters,
-        dispatched_namsaeng: values.station_id === 'koh_tao' ? values.dispatched_namsaeng : null,
-        dispatched_kfp: values.station_id === 'koh_tao' ? values.dispatched_kfp : null,
-        closing_liters,
-        employee_code: values.employee_code,
-        vehicle_plate: values.vehicle_plate || null,
-        reference_document_no: values.reference_document_no || null,
-        contract_code: values.contract_code || null,
-        record_source: 'manual',
-        source_file_name: null,
-        source_note: 'daily_entry',
-        note: values.note ?? null,
-        created_by: uid,
-        updated_by: uid,
-      },
-      { onConflict: 'station_id,record_date' }
-    )
+    .insert({
+      station_id: values.station_id,
+      record_date: values.record_date,
+      opening_liters: values.opening_liters,
+      received_liters: values.received_liters,
+      plan_received_liters: values.plan_received_liters ?? 0,
+      dispatched_liters,
+      dispatched_namsaeng: values.station_id === 'koh_tao' ? values.dispatched_namsaeng : null,
+      dispatched_kfp: values.station_id === 'koh_tao' ? values.dispatched_kfp : null,
+      closing_liters,
+      employee_code: values.employee_code,
+      vehicle_plate: values.vehicle_plate || null,
+      reference_document_no: values.reference_document_no || null,
+      contract_code: values.contract_code || null,
+      record_source: 'manual',
+      source_file_name: null,
+      source_note: 'daily_entry',
+      note: values.note ?? null,
+      created_by: uid,
+      updated_by: uid,
+    })
     .select('id')
     .single();
 
-  if (error) return { ok: false as const, error: error.message };
+  if (error) {
+    const message =
+      error.code === '23505'
+        ? 'ฐานข้อมูลยังจำกัด 1 รายการต่อวัน — ต้องรัน migration 0018 ก่อนจึงบันทึกหลายเที่ยวต่อวันได้'
+        : error.message;
+    return { ok: false as const, error: message };
+  }
 
   revalidatePath('/dashboard');
   revalidatePath('/entry');
@@ -166,13 +170,14 @@ export async function updateFuelRecord(id: string, raw: FuelRecordFormValues) {
   return { ok: true as const };
 }
 
-// ดึงยอดคงเหลือของวันก่อนหน้า เพื่อ autofill ช่อง "ยอดยกมา"
+// ดึงยอดคงเหลือล่าสุด (รวมรายการอื่นของวันเดียวกัน) เพื่อ autofill ช่อง "ยอดยกมา"
+// — ถ้าวันนี้บันทึกเที่ยวแรกไปแล้ว เที่ยวถัดไปจะยกยอดต่อจากเที่ยวล่าสุดของวันนี้ทันที
 export async function getPreviousClosing(stationId: string, beforeDate: string) {
   await requirePageAccess('entry');
 
   const access = await getCurrentUserAccess();
   if (!access.stationIds.includes(stationId as FuelRecordFormValues['station_id'])) {
-    return { closing: 0, recordDate: null };
+    return { closing: 0, recordDate: null, sameDay: false };
   }
 
   const supabase = await createClient();
@@ -180,11 +185,16 @@ export async function getPreviousClosing(stationId: string, beforeDate: string) 
     .from('fuel_records')
     .select('closing_liters, record_date')
     .eq('station_id', stationId)
-    .lt('record_date', beforeDate)
+    .lte('record_date', beforeDate)
     .order('record_date', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (error || !data) return { closing: 0, recordDate: null };
-  return { closing: Number(data.closing_liters), recordDate: data.record_date as string };
+  if (error || !data) return { closing: 0, recordDate: null, sameDay: false };
+  return {
+    closing: Number(data.closing_liters),
+    recordDate: data.record_date as string,
+    sameDay: data.record_date === beforeDate,
+  };
 }

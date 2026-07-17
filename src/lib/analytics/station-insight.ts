@@ -34,16 +34,25 @@ export function computeStationInsight(
   records: FuelRecord[],
   totalDispatchedForShare = 0
 ): StationInsight {
-  const stationRecords = records.filter((record) => record.station_id === station.id);
+  // เรียง (วันที่, เวลาที่บันทึก) เสมอ — 1 วันมีได้หลายรายการ ต้องให้รายการล่าสุดของวันอยู่ท้าย
+  const stationRecords = records
+    .filter((record) => record.station_id === station.id)
+    .sort((a, b) => a.record_date.localeCompare(b.record_date) || (a.created_at ?? '').localeCompare(b.created_at ?? ''));
   const received = stationRecords.reduce((sum, record) => sum + record.received_liters, 0);
   const dispatched = stationRecords.reduce((sum, record) => sum + record.dispatched_liters, 0);
   const activeDays = new Set(stationRecords.map((record) => record.record_date)).size;
   const latest = stationRecords.at(-1) ?? null;
-  const latestSeven = stationRecords.slice(-7);
-  const previousSeven = stationRecords.slice(-14, -7);
-  const recentUsage = latestSeven.reduce((sum, record) => sum + record.dispatched_liters, 0);
-  const previousUsage = previousSeven.reduce((sum, record) => sum + record.dispatched_liters, 0);
-  const averageDaily = latestSeven.length ? recentUsage / latestSeven.length : 0;
+  // ค่าเฉลี่ย/แนวโน้มคิดเป็น "รายวัน" (รวมทุกเที่ยวของวันเดียวกันเข้าด้วยกันก่อน)
+  const dispatchedByDay = new Map<string, number>();
+  for (const record of stationRecords) {
+    dispatchedByDay.set(record.record_date, (dispatchedByDay.get(record.record_date) ?? 0) + record.dispatched_liters);
+  }
+  const dayKeys = [...dispatchedByDay.keys()].sort();
+  const latestSevenDays = dayKeys.slice(-7);
+  const previousSevenDays = dayKeys.slice(-14, -7);
+  const recentUsage = latestSevenDays.reduce((sum, day) => sum + (dispatchedByDay.get(day) ?? 0), 0);
+  const previousUsage = previousSevenDays.reduce((sum, day) => sum + (dispatchedByDay.get(day) ?? 0), 0);
+  const averageDaily = latestSevenDays.length ? recentUsage / latestSevenDays.length : 0;
   const daysRemaining = averageDaily > 0 && latest ? latest.closing_liters / averageDaily : null;
   const etaDate = daysRemaining !== null && latest ? addDaysIso(latest.record_date, Math.floor(daysRemaining)) : null;
   const trendPct = previousUsage > 0 ? ((recentUsage - previousUsage) / previousUsage) * 100 : null;
@@ -109,7 +118,11 @@ export function buildTrendBuckets(records: FuelRecord[], periodMode: PeriodMode)
     }
   >();
 
-  records.forEach((record) => {
+  // เรียงก่อนเพื่อให้ "คงเหลือปลายช่วง" มาจากรายการล่าสุดจริงๆ แม้วันเดียวกันมีหลายเที่ยว
+  const sortedRecords = [...records].sort(
+    (a, b) => a.record_date.localeCompare(b.record_date) || (a.created_at ?? '').localeCompare(b.created_at ?? '')
+  );
+  sortedRecords.forEach((record) => {
     const period = periodMode === 'monthly' ? record.record_date.slice(0, 7) : record.record_date;
     const bucket = buckets.get(period) ?? { period, received: 0, dispatched: 0, closingByStation: {} };
     bucket.received += record.received_liters;

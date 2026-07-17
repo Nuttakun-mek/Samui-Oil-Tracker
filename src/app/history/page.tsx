@@ -38,9 +38,21 @@ function reporterText(record: FuelRecord, profileMap: Map<string, string>) {
   return employeeCode;
 }
 
+// เวลาที่บันทึกจริง (และเวลาแก้ไขล่าสุดถ้ามี) — ใช้แยกลำดับหลายเที่ยวในวันเดียวกัน
+function recordedAtText(record: FuelRecord) {
+  if (!record.created_at) return '-';
+  const format = (value: string) =>
+    new Date(value).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Bangkok' });
+  const created = format(record.created_at);
+  const edited = record.updated_at && record.updated_at !== record.created_at ? ` (แก้ไข ${format(record.updated_at)})` : '';
+  return `${created}${edited}`;
+}
+
 function checkHistoryRecords(records: FuelRecord[]) {
   const checks: RecordCheck[] = [];
   const recordsByStation = new Map<string, FuelRecord[]>();
+  // ระบุพื้นที่+วันที่ในทุกข้อความเตือน — ให้หาแถวที่มีปัญหาเจอทันที
+  const where = (record: FuelRecord) => `${STATION_LABEL[record.station_id]} วันที่ ${record.record_date}`;
 
   records.forEach((record) => {
     const namsaeng = record.dispatched_namsaeng ?? 0;
@@ -59,19 +71,19 @@ function checkHistoryRecords(records: FuelRecord[]) {
         kfp,
       ].some((value) => value < 0)
     ) {
-      checks.push({ id: record.id, level: 'error', message: 'มีค่าติดลบ' });
+      checks.push({ id: record.id, level: 'error', message: `${where(record)}: มีค่าติดลบ` });
     }
 
     if (Math.abs(record.closing_liters - expectedClosing) > CHECK_TOLERANCE_LITERS) {
       checks.push({
         id: record.id,
         level: 'error',
-        message: `คงเหลือไม่ตรง ควรเป็น ${Math.round(expectedClosing).toLocaleString('th-TH')} ลิตร`,
+        message: `${where(record)}: คงเหลือไม่ตรง ควรเป็น ${Math.round(expectedClosing).toLocaleString('th-TH')} ลิตร`,
       });
     }
 
     if (record.station_id === 'koh_tao' && record.dispatched_liters && Math.abs(record.dispatched_liters - (namsaeng + kfp)) > CHECK_TOLERANCE_LITERS) {
-      checks.push({ id: record.id, level: 'warning', message: 'ยอดจ่ายรวมไม่ตรงกับนำแสง+กฟภ.' });
+      checks.push({ id: record.id, level: 'warning', message: `${where(record)}: ยอดจ่ายรวมไม่ตรงกับนำแสง+กฟภ.` });
     }
 
     const stationRecords = recordsByStation.get(record.station_id) ?? [];
@@ -81,12 +93,17 @@ function checkHistoryRecords(records: FuelRecord[]) {
 
   recordsByStation.forEach((stationRecords) => {
     stationRecords
-      .sort((a, b) => a.record_date.localeCompare(b.record_date))
+      // 1 วันมีได้หลายเที่ยว — เทียบความต่อเนื่องตาม (วันที่, เวลาที่บันทึก) ของสถานีเดียวกัน
+      .sort((a, b) => a.record_date.localeCompare(b.record_date) || (a.created_at ?? '').localeCompare(b.created_at ?? ''))
       .forEach((record, index, sortedRecords) => {
         const previous = sortedRecords[index - 1];
         if (!previous) return;
         if (Math.abs(record.opening_liters - previous.closing_liters) > CHECK_TOLERANCE_LITERS) {
-          checks.push({ id: record.id, level: 'warning', message: 'ยอดยกมาไม่ตรงกับคงเหลือวันก่อนหน้า' });
+          checks.push({
+            id: record.id,
+            level: 'warning',
+            message: `${where(record)}: ยอดยกมา ${Math.round(record.opening_liters).toLocaleString('th-TH')} ไม่ตรงกับคงเหลือรายการก่อนหน้า ${Math.round(previous.closing_liters).toLocaleString('th-TH')} (${previous.record_date})`,
+          });
         }
       });
   });
@@ -105,7 +122,11 @@ export default async function HistoryPage({
   const supabase = await createClient();
   const { station: stationFilter } = await searchParams;
 
-  let query = supabase.from('fuel_records').select('*').order('record_date', { ascending: false });
+  let query = supabase
+    .from('fuel_records')
+    .select('*')
+    .order('record_date', { ascending: false })
+    .order('created_at', { ascending: false });
   if (stationFilter) query = query.eq('station_id', stationFilter);
 
   const { data } = await query;
@@ -212,6 +233,7 @@ export default async function HistoryPage({
                   )}
                 </div>
                 <div className="mt-1 text-xs font-semibold text-slate-500">ผู้รายงาน {reporterText(r, profileMap)}</div>
+                <div className="mt-0.5 text-xs text-slate-400">บันทึกเมื่อ {recordedAtText(r)}</div>
               </div>
               <div className="flex shrink-0 gap-2">
                 <RecordDocuments recordId={r.id} count={documentCounts.get(r.id) ?? 0} canEdit={role !== 'viewer'} />
@@ -252,7 +274,7 @@ export default async function HistoryPage({
       </div>
 
       <div className="table-shell hidden md:block">
-        <table className="w-full min-w-[1320px] text-sm">
+        <table className="w-full min-w-[1460px] text-sm">
           <thead>
             <tr className="table-header">
               <th className="text-left px-3.5 py-2.5">วันที่</th>
@@ -263,6 +285,7 @@ export default async function HistoryPage({
               <th className="text-right px-3.5 py-2.5">คงเหลือ</th>
               <th className="text-left px-3.5 py-2.5">สถานะข้อมูล</th>
               <th className="text-left px-3.5 py-2.5">รหัสพนักงาน</th>
+              <th className="text-left px-3.5 py-2.5">บันทึกเมื่อ</th>
               <th className="text-left px-3.5 py-2.5">หมายเหตุ</th>
               <th />
             </tr>
@@ -270,7 +293,7 @@ export default async function HistoryPage({
           <tbody>
             {records.length === 0 && (
               <tr>
-                <td colSpan={10} className="text-center py-10 text-slate-500">
+                <td colSpan={11} className="text-center py-10 text-slate-500">
                   ไม่พบข้อมูล
                 </td>
               </tr>
@@ -296,6 +319,7 @@ export default async function HistoryPage({
                   </div>
                 </td>
                 <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold text-slate-700">{reporterText(r, profileMap)}</td>
+                <td className="px-3.5 py-2.5 whitespace-nowrap text-xs tabular-nums text-slate-500">{recordedAtText(r)}</td>
                 <td className="px-3.5 py-2.5">
                   <div>{r.note || '-'}</div>
                   {issues.length > 0 && (

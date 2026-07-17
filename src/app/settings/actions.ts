@@ -692,7 +692,26 @@ export async function importFuelRecords(
     return { ok: false as const, error: errors.slice(0, 10).join('\n') };
   }
 
-  const { error } = await supabase.from('fuel_records').upsert(payload, { onConflict: 'station_id,record_date' });
+  // นำเข้าแบบ idempotent: ลบแถวนำเข้าเดิมของ (สถานี, วันที่) เดียวกันก่อน แล้ว insert ใหม่
+  // — แตะเฉพาะแถวที่มาจากการนำเข้า (upload/database) ไม่กระทบรายการที่พนักงานกรอกหลายเที่ยวต่อวัน
+  // (แทน upsert เดิมซึ่งพึ่ง unique constraint ที่ถูกถอดใน migration 0018)
+  const datesByStation = new Map<string, Set<string>>();
+  for (const row of payload) {
+    const dates = datesByStation.get(row.station_id) ?? new Set<string>();
+    dates.add(row.record_date);
+    datesByStation.set(row.station_id, dates);
+  }
+  for (const [stationId, dates] of datesByStation) {
+    const { error: cleanupError } = await supabase
+      .from('fuel_records')
+      .delete()
+      .eq('station_id', stationId)
+      .in('record_date', [...dates])
+      .in('record_source', ['upload', 'database']);
+    if (cleanupError) return { ok: false as const, error: cleanupError.message };
+  }
+
+  const { error } = await supabase.from('fuel_records').insert(payload);
   if (error) {
     if (error.message.includes('employee_code')) {
       return {
@@ -810,7 +829,24 @@ export async function importDatabaseExportRows(kind: DatabaseExportKind, rows: D
     if (errors.length) return { ok: false as const, error: errors.slice(0, 10).join('\n') };
     if (!payload.length) return { ok: false as const, error: 'ไม่พบ record ที่พร้อมนำเข้า' };
 
-    const { error } = await supabase.from('fuel_records').upsert(payload, { onConflict: 'station_id,record_date' });
+    // idempotent เช่นเดียวกับ importFuelRecords: ลบแถวนำเข้าเดิมของ (สถานี, วันที่) เดียวกันก่อน insert
+    const datesByStation = new Map<string, Set<string>>();
+    for (const row of payload) {
+      const dates = datesByStation.get(row.station_id) ?? new Set<string>();
+      dates.add(row.record_date);
+      datesByStation.set(row.station_id, dates);
+    }
+    for (const [stationId, dates] of datesByStation) {
+      const { error: cleanupError } = await supabase
+        .from('fuel_records')
+        .delete()
+        .eq('station_id', stationId)
+        .in('record_date', [...dates])
+        .in('record_source', ['upload', 'database']);
+      if (cleanupError) return { ok: false as const, error: cleanupError.message };
+    }
+
+    const { error } = await supabase.from('fuel_records').insert(payload);
     if (error) return { ok: false as const, error: error.message };
 
     revalidatePath('/settings');

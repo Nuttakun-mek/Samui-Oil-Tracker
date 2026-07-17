@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Paperclip } from 'lucide-react';
@@ -15,6 +15,7 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
   const [isPending, startTransition] = useTransition();
   const [toast, setToast] = useState<string | null>(null);
   const [previousDate, setPreviousDate] = useState<string | null>(null);
+  const [previousSameDay, setPreviousSameDay] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const defaultStationId = stations[0]?.id ?? 'samui';
@@ -53,14 +54,19 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
   const kfp = watch('dispatched_kfp') || 0;
   const recordDate = watch('record_date');
 
-  // autofill "ยอดยกมา" จากยอดคงเหลือวันก่อนหน้า
-  useEffect(() => {
+  // autofill "ยอดยกมา" จากยอดคงเหลือล่าสุด (รวมเที่ยวก่อนหน้าของวันเดียวกัน)
+  const refreshOpening = useCallback(() => {
     if (!station || !recordDate) return;
     getPreviousClosing(station, recordDate).then((previous) => {
       setValue('opening_liters', previous.closing);
       setPreviousDate(previous.recordDate);
+      setPreviousSameDay(previous.sameDay);
     });
   }, [station, recordDate, setValue]);
+
+  useEffect(() => {
+    refreshOpening();
+  }, [refreshOpening]);
 
   const closing = computeClosing({
     station_id: station,
@@ -109,6 +115,8 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
           note: '',
           confirmed: false,
         });
+        // เที่ยวถัดไปของวันเดียวกันต้องยกยอดต่อจากรายการที่เพิ่งบันทึก
+        refreshOpening();
       } else {
         setToast(`เกิดข้อผิดพลาด: ${res.error}`);
       }
@@ -176,7 +184,11 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
             </label>
             <input type="number" step="0.1" {...register('opening_liters')} className="field" />
             <p className="mt-1 text-xs text-slate-500">
-              {previousDate ? `จากยอดปิดวันที่ ${previousDate}` : 'ไม่พบยอดปิดก่อนหน้า'}
+              {previousDate
+                ? previousSameDay
+                  ? 'ยกยอดต่อจากเที่ยวล่าสุดของวันเดียวกัน'
+                  : `จากยอดปิดวันที่ ${previousDate}`
+                : 'ไม่พบยอดปิดก่อนหน้า'}
             </p>
           </div>
           <div>

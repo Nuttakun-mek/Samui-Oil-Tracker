@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     : visibleStationIds;
   const [{ data: stations }, { data: records, error }] = await Promise.all([
     supabase.from('stations').select('*').in('id', stationIds).order('name'),
-    supabase.from('fuel_records').select('*').in('station_id', stationIds).gte('record_date', from).lte('record_date', to).order('record_date').order('station_id'),
+    supabase.from('fuel_records').select('*').in('station_id', stationIds).gte('record_date', from).lte('record_date', to).order('record_date').order('created_at').order('station_id'),
   ]);
   if (error) return new Response(error.message, { status: 500 });
 

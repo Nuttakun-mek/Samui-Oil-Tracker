@@ -65,6 +65,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .gte('record_date', from)
       .lte('record_date', to)
       .order('record_date')
+      .order('created_at')
       .order('station_id'),
   ]);
 
