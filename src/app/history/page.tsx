@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { STATION_IDS, STATION_LABEL, type FuelRecord } from '@/lib/types/domain';
+import { formatThaiDateCompact } from '@/lib/format/thai-date';
 import Link from 'next/link';
 import { DeleteButton } from './delete-button';
 import { EditRecordButton } from './edit-record-button';
@@ -41,7 +42,7 @@ function checkHistoryRecords(records: FuelRecord[]) {
   const checks: RecordCheck[] = [];
   const recordsByStation = new Map<string, FuelRecord[]>();
   // ระบุพื้นที่+วันที่ในทุกข้อความเตือน — ให้หาแถวที่มีปัญหาเจอทันที
-  const where = (record: FuelRecord) => `${STATION_LABEL[record.station_id]} วันที่ ${record.record_date}`;
+  const where = (record: FuelRecord) => `${STATION_LABEL[record.station_id]} วันที่ ${formatThaiDateCompact(record.record_date)}`;
 
   records.forEach((record) => {
     const namsaeng = record.dispatched_namsaeng ?? 0;
@@ -91,7 +92,7 @@ function checkHistoryRecords(records: FuelRecord[]) {
           checks.push({
             id: record.id,
             level: 'warning',
-            message: `${where(record)}: ยอดยกมา ${Math.round(record.opening_liters).toLocaleString('th-TH')} ไม่ตรงกับคงเหลือรายการก่อนหน้า ${Math.round(previous.closing_liters).toLocaleString('th-TH')} (${previous.record_date})`,
+            message: `${where(record)}: ยอดยกมา ${Math.round(record.opening_liters).toLocaleString('th-TH')} ไม่ตรงกับคงเหลือรายการก่อนหน้า ${Math.round(previous.closing_liters).toLocaleString('th-TH')} (${formatThaiDateCompact(previous.record_date)})`,
           });
         }
       });
@@ -197,7 +198,7 @@ export default async function HistoryPage({
           <article key={r.id} className={`panel space-y-3 ${hasError ? 'border-red-200 bg-red-50' : issues.length ? 'border-amber-200 bg-amber-50' : ''}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-bold text-brand-700">{r.record_date}</div>
+                <div className="text-xs font-bold text-brand-700">{formatThaiDateCompact(r.record_date)}</div>
                 <h2 className="mt-0.5 text-sm font-extrabold leading-5 text-slate-950">{STATION_LABEL[r.station_id]}</h2>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <span className={`rounded-full border px-2 py-0.5 text-[11px] font-extrabold ${sourceClass(r)}`}>
@@ -285,7 +286,7 @@ export default async function HistoryPage({
               const hasError = issues.some((issue) => issue.level === 'error');
               return (
               <tr key={r.id} className={`border-b border-slate-200 last:border-0 hover:bg-slate-50 ${hasError ? 'bg-red-50' : issues.length ? 'bg-amber-50' : ''}`}>
-                <td className="px-3.5 py-2.5 tabular-nums whitespace-nowrap">{r.record_date}</td>
+                <td className="px-3.5 py-2.5 tabular-nums whitespace-nowrap">{formatThaiDateCompact(r.record_date)}</td>
                 <td className="px-3.5 py-2.5 whitespace-nowrap">{STATION_LABEL[r.station_id]}</td>
                 <td className="px-3.5 py-2.5 text-right tabular-nums">{Math.round(r.opening_liters).toLocaleString('th-TH')}</td>
                 <td className="px-3.5 py-2.5 text-right tabular-nums">{Math.round(r.received_liters).toLocaleString('th-TH')}</td>

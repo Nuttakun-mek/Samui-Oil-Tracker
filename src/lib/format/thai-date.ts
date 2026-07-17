@@ -28,6 +28,14 @@ export function formatThaiDateShort(isoDate: string) {
   return `${day} ${THAI_MONTHS_SHORT[month - 1]} ${String(year + 543).slice(-2)}`;
 }
 
+// วันที่ เดือนย่อ พ.ศ. เต็ม 4 หลัก เช่น "14 ก.ค. 2569" — ใช้ในตารางที่ต้องการกระชับกว่า formatThaiDate
+// แต่ปีต้องเต็มไม่ย่อ (ต่างจาก formatThaiDateShort ที่ย่อปีเหลือ 2 หลัก)
+export function formatThaiDateCompact(isoDate: string) {
+  const { year, month, day } = dateParts(isoDate);
+  if (!year || !month || !day) return isoDate;
+  return `${day} ${THAI_MONTHS_SHORT[month - 1]} ${year + 543}`;
+}
+
 export function formatThaiMonth(monthKey: string) {
   const [year, month] = monthKey.split('-').map(Number);
   if (!year || !month) return monthKey;
