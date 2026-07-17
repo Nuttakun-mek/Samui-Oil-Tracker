@@ -8,10 +8,6 @@ import { getCurrentUserAccess, requirePageAccess } from '@/lib/auth/server';
 
 export const revalidate = 0;
 
-type ProfileLite = {
-  id: string;
-  full_name: string | null;
-};
 type RecordCheck = {
   id: string;
   level: 'error' | 'warning';
@@ -29,13 +25,6 @@ function sourceClass(record: FuelRecord) {
   if (record.record_source === 'upload') return 'border-sky-200 bg-sky-50 text-sky-800';
   if (record.record_source === 'database') return 'border-slate-200 bg-slate-50 text-slate-700';
   return 'border-emerald-200 bg-emerald-50 text-emerald-800';
-}
-
-function reporterText(record: FuelRecord, profileMap: Map<string, string>) {
-  const profileName = record.created_by ? profileMap.get(record.created_by) : null;
-  const employeeCode = record.employee_code || '-';
-  if (profileName) return `${profileName} / ${employeeCode}`;
-  return employeeCode;
 }
 
 // เวลาที่บันทึกจริง (และเวลาแก้ไขล่าสุดถ้ามี) — ใช้แยกลำดับหลายเที่ยวในวันเดียวกัน
@@ -131,14 +120,7 @@ export default async function HistoryPage({
 
   const { data } = await query;
   const records = (data ?? []) as FuelRecord[];
-  const profileIds = Array.from(new Set(records.flatMap((record) => [record.created_by, record.updated_by]).filter(Boolean))) as string[];
-  const [{ data: profiles }, { data: documentRows }] = await Promise.all([
-    profileIds.length
-      ? supabase.from('profiles').select('id, full_name').in('id', profileIds)
-      : Promise.resolve({ data: [] as ProfileLite[] }),
-    supabase.from('fuel_record_documents').select('record_id'),
-  ]);
-  const profileMap = new Map((profiles ?? []).map((profile: ProfileLite) => [profile.id, profile.full_name ?? profile.id]));
+  const { data: documentRows } = await supabase.from('fuel_record_documents').select('record_id');
   const documentCounts = new Map<string, number>();
   for (const row of documentRows ?? []) {
     const recordId = row.record_id as string;
@@ -232,7 +214,7 @@ export default async function HistoryPage({
                     </span>
                   )}
                 </div>
-                <div className="mt-1 text-xs font-semibold text-slate-500">ผู้รายงาน {reporterText(r, profileMap)}</div>
+                <div className="mt-1 text-xs font-semibold text-slate-500">รหัสพนักงาน {r.employee_code || '-'}</div>
                 <div className="mt-0.5 text-xs text-slate-400">บันทึกเมื่อ {recordedAtText(r)}</div>
               </div>
               <div className="flex shrink-0 gap-2">
@@ -318,7 +300,7 @@ export default async function HistoryPage({
                     {r.source_sheet_name && <div className="max-w-40 truncate text-xs text-slate-500">Sheet: {r.source_sheet_name}</div>}
                   </div>
                 </td>
-                <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold text-slate-700">{reporterText(r, profileMap)}</td>
+                <td className="px-3.5 py-2.5 whitespace-nowrap font-semibold tabular-nums text-slate-700">{r.employee_code || '-'}</td>
                 <td className="px-3.5 py-2.5 whitespace-nowrap text-xs tabular-nums text-slate-500">{recordedAtText(r)}</td>
                 <td className="px-3.5 py-2.5">
                   <div>{r.note || '-'}</div>
