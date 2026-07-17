@@ -10,6 +10,7 @@ import { getCurrentUserAccess, requirePageAccess } from '@/lib/auth/server';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
 import { computeStationInsights } from '@/lib/analytics/station-insight';
 import { LowStockBanner } from '@/components/low-stock-banner';
+import { formatThaiDate } from '@/lib/format/thai-date';
 import { ProcurementBalanceCard } from '@/components/procurement-balance-card';
 import { getProcurementSummary } from '@/lib/procurement';
 import Link from 'next/link';
@@ -114,6 +115,9 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* ข้อความเตือนต้องอยู่บนสุดของหน้าเสมอ */}
+      <LowStockBanner insights={stationInsights} />
+
       <ProcurementBalanceCard groups={procurementSummary.groups} isAdmin={role === 'admin'} />
 
       {recordList.length === 0 ? (
@@ -137,8 +141,6 @@ export default async function DashboardPage() {
         </section>
       ) : (
         <>
-      <LowStockBanner insights={stationInsights} />
-
       <section>
         <div className="mb-3">
           <h2 className="text-lg font-extrabold text-slate-950">สถานะน้ำมันรายพื้นที่</h2>
@@ -198,28 +200,41 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ข้อมูลชุดเดียวกัน (สรุป 30 วันล่าสุด) รวมอยู่ในการ์ดเดียว */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <KpiCard
           label="คงเหลือรวม 3 พื้นที่"
           value={recordList.length ? stationList.reduce((a, st) => a + (latest(st.id)?.closing_liters ?? 0), 0) : 0}
           unit="ลิตร"
         />
-        <KpiCard
-          label={`รับสะสม (${recentStartDate ?? '-'} ถึง ${latestRecordDate ?? '-'})`}
-          value={stationList.reduce((a, st) => a + recentByStation(st.id, 30).reduce((x, r) => x + r.received_liters, 0), 0)}
-          unit="ลิตร"
-        />
-        <KpiCard
-          label={`ใช้น้ำมันสะสม (${recentStartDate ?? '-'} ถึง ${latestRecordDate ?? '-'})`}
-          value={stationList.reduce((a, st) => a + recentByStation(st.id, 30).reduce((x, r) => x + r.dispatched_liters, 0), 0)}
-          unit="ลิตร"
-        />
-        <KpiCard
-          label="งบประมาณใช้จ่ายโดยประมาณ 30 วัน"
-          value={estimatedFuelCost(stationList, stationList.flatMap((st) => recentByStation(st.id, 30)))}
-          unit="บาท"
-          decimals={2}
-        />
+        <div className="panel border-l-4 border-l-brand-700 lg:col-span-3">
+          <div className="mb-2 text-xs font-bold text-slate-500">
+            สรุป 30 วันล่าสุด ({recentStartDate ? formatThaiDate(recentStartDate) : '-'} ถึง {latestRecordDate ? formatThaiDate(latestRecordDate) : '-'})
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <div className="text-xs font-semibold text-emerald-700">รับสะสม</div>
+              <div className="text-2xl font-extrabold tabular-nums text-slate-950">
+                {Math.round(stationList.reduce((a, st) => a + recentByStation(st.id, 30).reduce((x, r) => x + r.received_liters, 0), 0)).toLocaleString('th-TH')}{' '}
+                <small className="text-sm font-semibold text-slate-500">ลิตร</small>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-amber-700">ใช้น้ำมันสะสม</div>
+              <div className="text-2xl font-extrabold tabular-nums text-slate-950">
+                {Math.round(stationList.reduce((a, st) => a + recentByStation(st.id, 30).reduce((x, r) => x + r.dispatched_liters, 0), 0)).toLocaleString('th-TH')}{' '}
+                <small className="text-sm font-semibold text-slate-500">ลิตร</small>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-slate-500">งบประมาณใช้จ่ายโดยประมาณ</div>
+              <div className="text-2xl font-extrabold tabular-nums text-slate-950">
+                {estimatedFuelCost(stationList, stationList.flatMap((st) => recentByStation(st.id, 30))).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                <small className="text-sm font-semibold text-slate-500">บาท</small>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <DashboardAnalytics stations={stationList} records={recordList} />

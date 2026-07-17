@@ -20,18 +20,17 @@ export function TankGauge({
   lowStockDays: number;
 }) {
   const clamped = Math.max(0, Math.min(100, pct));
-  const status = daysRemaining !== null && daysRemaining < lowStockDays
-    ? 'danger'
-    : (daysRemaining !== null && daysRemaining < lowStockDays * 1.5) || clamped < 35
-      ? 'warn'
-      : 'ok';
-  const fillColor = { ok: '#722257', warn: '#C69214', danger: '#B23A1B' }[status];
+  // สีตามสัดส่วนน้ำมันในถัง: มากกว่า 60% เขียว, มากกว่า 40% เหลือง, ต่ำกว่านั้นแดง
+  const status = clamped > 60 ? 'ok' : clamped > 40 ? 'warn' : 'danger';
+  const fillColor = { ok: '#15803D', warn: '#C69214', danger: '#B23A1B' }[status];
   const statusText = { ok: 'ปกติ', warn: 'เฝ้าระวัง', danger: 'วิกฤต' }[status];
   const statusClass = {
-    ok: 'bg-brand-50 text-brand-700',
+    ok: 'bg-emerald-50 text-emerald-700',
     warn: 'bg-gold-50 text-gold-700',
     danger: 'bg-red-50 text-red-700',
   }[status];
+  // จำนวนวันเหลือยังเตือนตามเกณฑ์วัน (คนละเรื่องกับสัดส่วนถัง — ถังเกือบเต็มแต่ใช้เร็วก็หมดไวได้)
+  const daysCritical = daysRemaining !== null && daysRemaining < lowStockDays;
 
   return (
     <div className="panel">
@@ -69,7 +68,7 @@ export function TankGauge({
         </div>
         <div>
           <dt className="text-xs font-semibold text-slate-500">คาดว่าใช้ได้อีก</dt>
-          <dd className={`mt-0.5 text-base font-extrabold tabular-nums ${status === 'danger' ? 'text-red-700' : 'text-slate-900'}`}>
+          <dd className={`mt-0.5 text-base font-extrabold tabular-nums ${daysCritical ? 'text-red-700' : 'text-slate-900'}`}>
             {daysRemaining === null ? '-' : daysRemaining.toLocaleString('th-TH', { maximumFractionDigits: 1 })} <span className="text-xs font-semibold text-slate-500">วัน</span>
           </dd>
           {etaDate && <dd className="mt-0.5 text-xs font-semibold text-slate-500">คาดหมดวันที่ {formatThaiDate(etaDate)}</dd>}

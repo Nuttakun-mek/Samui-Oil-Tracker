@@ -189,7 +189,11 @@ export default function EntryForm({ stations }: { stations: Station[] }) {
               <span>ยอดยกมา (ลิตร)</span>
               <span className="text-xs font-normal text-slate-500">อัตโนมัติ · แก้ไขไม่ได้</span>
             </label>
-            <input type="number" step="0.1" readOnly aria-readonly="true" {...register('opening_liters')} className="field cursor-not-allowed bg-slate-50 text-slate-700" />
+            {/* ช่องอ่านอย่างเดียว — แสดงแบบมีเครื่องหมายคั่นหลัก ส่วนค่าจริงส่งผ่าน hidden input */}
+            <input type="hidden" {...register('opening_liters')} />
+            <div className="field flex cursor-not-allowed items-center bg-slate-50 font-semibold tabular-nums text-slate-700" aria-readonly="true">
+              {opening.toLocaleString('th-TH', { maximumFractionDigits: 1 })} ลิตร
+            </div>
             <p className="mt-1 text-xs text-slate-500">
               {previousDate
                 ? previousSameDay
