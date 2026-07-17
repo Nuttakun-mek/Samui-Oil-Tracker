@@ -178,6 +178,100 @@ export async function updateFuelRecord(id: string, raw: FuelRecordFormValues) {
   return { ok: true as const };
 }
 
+export interface CascadeRow {
+  id: string;
+  record_date: string;
+  oldOpening: number;
+  newOpening: number;
+  oldClosing: number;
+  newClosing: number;
+}
+
+// คำนวณผลกระทบต่อรายการถัดไปของสถานีเดียวกัน (เรียงตามวันที่+เวลาบันทึก) แบบ dry-run ไม่เขียนข้อมูลจริง
+// ใช้ตอนแก้ไข record เก่าที่มีรายการหลังจากนั้นแล้ว — ยอดคงเหลือใหม่จะไล่กลายเป็นยอดยกมาของรายการถัดไปต่อเนื่องกัน
+export async function previewRecordCascade(id: string, raw: FuelRecordFormValues) {
+  await requirePageAccess('history');
+
+  const parsed = fuelRecordFormSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' };
+  }
+  const values = parsed.data;
+  const access = await getCurrentUserAccess();
+  if (!access.stationIds.includes(values.station_id)) {
+    return { ok: false as const, error: 'บัญชีนี้ไม่มีสิทธิ์แก้ไขข้อมูลของพื้นที่ที่เลือก' };
+  }
+
+  const supabase = await createClient();
+  // ดึงทุกแถวของสถานีนี้มาเรียงเอง (แทน filter ซับซ้อนฝั่ง query) — ปลอดภัยกว่าและจำนวนแถวต่อสถานีไม่มาก
+  const { data: stationRecords } = await supabase
+    .from('fuel_records')
+    .select('*')
+    .eq('station_id', values.station_id)
+    .order('record_date', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  const rows = stationRecords ?? [];
+  const targetIndex = rows.findIndex((row) => row.id === id);
+  if (targetIndex === -1) return { ok: false as const, error: 'ไม่พบรายการที่ต้องการแก้ไข' };
+
+  const newTargetClosing = computeClosing(values);
+  const after = rows.slice(targetIndex + 1);
+
+  const downstream: CascadeRow[] = [];
+  let runningOpening = newTargetClosing;
+  for (const row of after) {
+    const rowClosing = computeClosing({
+      station_id: row.station_id,
+      opening_liters: runningOpening,
+      received_liters: row.received_liters,
+      dispatched_liters: row.dispatched_liters,
+      dispatched_namsaeng: row.dispatched_namsaeng ?? 0,
+      dispatched_kfp: row.dispatched_kfp ?? 0,
+    });
+    downstream.push({
+      id: row.id,
+      record_date: row.record_date,
+      oldOpening: Number(row.opening_liters),
+      newOpening: runningOpening,
+      oldClosing: Number(row.closing_liters),
+      newClosing: rowClosing,
+    });
+    runningOpening = rowClosing;
+  }
+
+  return { ok: true as const, newTargetClosing, downstream };
+}
+
+// บันทึกการแก้ไข พร้อมไล่ปรับ "ยอดยกมา" ของรายการถัดไปให้ต่อเนื่องกันอัตโนมัติ (คำนวณซ้ำฝั่งเซิร์ฟเวอร์เอง ไม่เชื่อค่าจาก client)
+export async function updateFuelRecordWithCascade(id: string, raw: FuelRecordFormValues) {
+  const first = await updateFuelRecord(id, raw);
+  if (!first.ok) return first;
+
+  const preview = await previewRecordCascade(id, raw);
+  if (!preview.ok) return { ok: true as const, cascadedCount: 0 }; // แถวหลักบันทึกสำเร็จแล้ว แค่ไล่ต่อไม่ได้ ไม่ถือเป็นความล้มเหลว
+
+  const supabase = await createClient();
+  const access = await getCurrentUserAccess();
+  const failed: string[] = [];
+  for (const row of preview.downstream) {
+    const { error } = await supabase
+      .from('fuel_records')
+      .update({ opening_liters: row.newOpening, closing_liters: row.newClosing, updated_by: access.user.id })
+      .eq('id', row.id);
+    if (error) failed.push(row.record_date);
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/entry');
+  revalidatePath('/history');
+
+  if (failed.length) {
+    return { ok: true as const, cascadedCount: preview.downstream.length - failed.length, failedDates: failed };
+  }
+  return { ok: true as const, cascadedCount: preview.downstream.length };
+}
+
 // ดึงยอดคงเหลือล่าสุด (รวมรายการอื่นของวันเดียวกัน) เพื่อ autofill ช่อง "ยอดยกมา"
 // — ถ้าวันนี้บันทึกเที่ยวแรกไปแล้ว เที่ยวถัดไปจะยกยอดต่อจากเที่ยวล่าสุดของวันนี้ทันที
 export async function getPreviousClosing(stationId: string, beforeDate: string) {

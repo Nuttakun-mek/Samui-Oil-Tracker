@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { AlertTriangle } from 'lucide-react';
 import {
   STATION_LABEL,
   computeClosing,
@@ -9,12 +10,17 @@ import {
   type FuelRecordFormValues,
   type StationId,
 } from '@/lib/types/domain';
+import { formatThaiDateCompact } from '@/lib/format/thai-date';
 import { DatePicker } from '@/components/ui/date-picker';
-import { updateFuelRecord } from '../entry/actions';
+import { updateFuelRecord, updateFuelRecordWithCascade, previewRecordCascade, type CascadeRow } from '../entry/actions';
 
 function toNumber(value: FormDataEntryValue | null) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function liters(value: number) {
+  return Math.round(value).toLocaleString('th-TH');
 }
 
 export function EditRecordButton({
@@ -30,6 +36,9 @@ export function EditRecordButton({
   const [message, setMessage] = useState<string | null>(null);
   const [recordDate, setRecordDate] = useState(record.record_date);
   const [isPending, startTransition] = useTransition();
+  const [isPreviewing, startPreviewTransition] = useTransition();
+  const [pendingValues, setPendingValues] = useState<FuelRecordFormValues | null>(null);
+  const [cascadeRows, setCascadeRows] = useState<CascadeRow[] | null>(null);
   const router = useRouter();
 
   const initialStation = record.station_id;
@@ -46,30 +55,84 @@ export function EditRecordButton({
     [record]
   );
 
+  const valuesFromForm = (formData: FormData): FuelRecordFormValues => ({
+    station_id: String(formData.get('station_id')) as StationId,
+    record_date: String(formData.get('record_date') ?? ''),
+    opening_liters: toNumber(formData.get('opening_liters')),
+    received_liters: toNumber(formData.get('received_liters')),
+    plan_received_liters: toNumber(formData.get('plan_received_liters')),
+    dispatched_liters: toNumber(formData.get('dispatched_liters')),
+    dispatched_namsaeng: toNumber(formData.get('dispatched_namsaeng')),
+    dispatched_kfp: toNumber(formData.get('dispatched_kfp')),
+    employee_code: String(formData.get('employee_code') ?? '').trim(),
+    vehicle_plate: String(formData.get('vehicle_plate') ?? '').trim(),
+    reference_document_no: String(formData.get('reference_document_no') ?? '').trim(),
+    contract_code: String(formData.get('contract_code') ?? '').trim(),
+    note: String(formData.get('note') ?? '').trim(),
+    confirmed: true,
+  });
+
+  const closeAndReset = () => {
+    setOpen(false);
+    setCascadeRows(null);
+    setPendingValues(null);
+  };
+
+  // ตรวจก่อนว่าการแก้ไขนี้กระทบรายการถัดไปหรือไม่ — ถ้ากระทบ แสดง preview ให้ยืนยันก่อน ไม่บันทึกเงียบๆ ทันที
   const onSubmit = (formData: FormData) => {
     setMessage(null);
-    const stationId = String(formData.get('station_id')) as StationId;
-    const values: FuelRecordFormValues = {
-      station_id: stationId,
-      record_date: String(formData.get('record_date') ?? ''),
-      opening_liters: toNumber(formData.get('opening_liters')),
-      received_liters: toNumber(formData.get('received_liters')),
-      plan_received_liters: toNumber(formData.get('plan_received_liters')),
-      dispatched_liters: toNumber(formData.get('dispatched_liters')),
-      dispatched_namsaeng: toNumber(formData.get('dispatched_namsaeng')),
-      dispatched_kfp: toNumber(formData.get('dispatched_kfp')),
-      employee_code: String(formData.get('employee_code') ?? '').trim(),
-      vehicle_plate: String(formData.get('vehicle_plate') ?? '').trim(),
-      reference_document_no: String(formData.get('reference_document_no') ?? '').trim(),
-      contract_code: String(formData.get('contract_code') ?? '').trim(),
-      note: String(formData.get('note') ?? '').trim(),
-      confirmed: true,
-    };
+    const values = valuesFromForm(formData);
 
+    startPreviewTransition(async () => {
+      const preview = await previewRecordCascade(record.id, values);
+      if (!preview.ok) {
+        // preview ทำไม่ได้ (เช่น สิทธิ์/ข้อมูลไม่ผ่าน) ให้ลองบันทึกตรงๆ เพื่อเห็น error ที่แท้จริง
+        const result = await updateFuelRecord(record.id, values);
+        if (result.ok) {
+          closeAndReset();
+          router.refresh();
+        } else {
+          setMessage(result.error);
+        }
+        return;
+      }
+      const affected = preview.downstream.filter((row) => Math.abs(row.newClosing - row.oldClosing) > 0.05 || Math.abs(row.newOpening - row.oldOpening) > 0.05);
+      if (!affected.length) {
+        startTransition(async () => {
+          const result = await updateFuelRecord(record.id, values);
+          if (result.ok) {
+            closeAndReset();
+            router.refresh();
+          } else {
+            setMessage(result.error);
+          }
+        });
+        return;
+      }
+      setPendingValues(values);
+      setCascadeRows(affected);
+    });
+  };
+
+  const commitSaveOnly = () => {
+    if (!pendingValues) return;
     startTransition(async () => {
-      const result = await updateFuelRecord(record.id, values);
+      const result = await updateFuelRecord(record.id, pendingValues);
       if (result.ok) {
-        setOpen(false);
+        closeAndReset();
+        router.refresh();
+      } else {
+        setMessage(result.error);
+      }
+    });
+  };
+
+  const commitWithCascade = () => {
+    if (!pendingValues) return;
+    startTransition(async () => {
+      const result = await updateFuelRecordWithCascade(record.id, pendingValues);
+      if (result.ok) {
+        closeAndReset();
         router.refresh();
       } else {
         setMessage(result.error);
@@ -94,14 +157,75 @@ export function EditRecordButton({
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-xl bg-white p-4 shadow-2xl sm:rounded-xl sm:p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-extrabold text-slate-950">แก้ไข record</h2>
-                <p className="text-sm text-slate-500">ปรับข้อมูลที่นำเข้าแล้ว และบันทึกกลับเข้าระบบ</p>
+                <h2 className="text-lg font-extrabold text-slate-950">{cascadeRows ? 'ยืนยันผลกระทบต่อรายการถัดไป' : 'แก้ไข record'}</h2>
+                <p className="text-sm text-slate-500">
+                  {cascadeRows ? 'การแก้ไขนี้จะเปลี่ยนยอดยกมา/คงเหลือของรายการถัดไปด้วย ตรวจสอบก่อนยืนยัน' : 'ปรับข้อมูลที่นำเข้าแล้ว และบันทึกกลับเข้าระบบ'}
+                </p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="btn-secondary px-3 py-1 text-sm">
+              <button type="button" onClick={closeAndReset} className="btn-secondary px-3 py-1 text-sm">
                 ปิด
               </button>
             </div>
 
+            {cascadeRows ? (
+              <div className="space-y-3">
+                <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
+                  <AlertTriangle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <p>
+                    พบ <strong>{cascadeRows.length} รายการ</strong> ที่ยอดยกมาต่อเนื่องจากรายการนี้ — เลือก
+                    &ldquo;บันทึกและปรับปรุงต่อเนื่อง&rdquo; เพื่อไล่แก้ทั้งหมดให้ตรงกันอัตโนมัติ หรือ &ldquo;บันทึกเฉพาะรายการนี้&rdquo;
+                    ถ้าความต่างของรายการถัดไปเป็นความตั้งใจ (เช่น วัดถังจริงแล้วเจอค่าคลาดเคลื่อน)
+                  </p>
+                </div>
+                <div className="table-shell">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="table-header">
+                        <th className="px-3 py-2 text-left">วันที่</th>
+                        <th className="px-3 py-2 text-right">ยอดยกมา</th>
+                        <th className="px-3 py-2 text-right">ยอดคงเหลือ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cascadeRows.map((row) => (
+                        <tr key={row.id} className="border-t border-slate-200">
+                          <td className="px-3 py-2 font-semibold text-slate-900">{formatThaiDateCompact(row.record_date)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            <span className="text-slate-400 line-through">{liters(row.oldOpening)}</span>{' '}
+                            <span className="font-bold text-emerald-700">{liters(row.newOpening)}</span>
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            <span className="text-slate-400 line-through">{liters(row.oldClosing)}</span>{' '}
+                            <span className="font-bold text-emerald-700">{liters(row.newClosing)}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {message && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{message}</div>}
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCascadeRows(null);
+                      setPendingValues(null);
+                    }}
+                    className="btn-secondary"
+                  >
+                    ย้อนกลับไปแก้ไข
+                  </button>
+                  <button type="button" disabled={isPending} onClick={commitSaveOnly} className="btn-secondary">
+                    {isPending ? 'กำลังบันทึก...' : 'บันทึกเฉพาะรายการนี้'}
+                  </button>
+                  <button type="button" disabled={isPending} onClick={commitWithCascade} className="btn-primary">
+                    {isPending ? 'กำลังบันทึก...' : `บันทึกและปรับปรุงต่อเนื่อง (${cascadeRows.length} รายการ)`}
+                  </button>
+                </div>
+              </div>
+            ) : (
             <form action={onSubmit} className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -201,14 +325,15 @@ export function EditRecordButton({
               {message && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{message}</div>}
 
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <button type="button" onClick={() => setOpen(false)} className="btn-secondary">
+                <button type="button" onClick={() => closeAndReset()} className="btn-secondary">
                   ยกเลิก
                 </button>
-                <button type="submit" disabled={isPending} className="btn-primary">
-                  {isPending ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                <button type="submit" disabled={isPreviewing || isPending} className="btn-primary">
+                  {isPreviewing ? 'กำลังตรวจสอบผลกระทบ...' : isPending ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}
