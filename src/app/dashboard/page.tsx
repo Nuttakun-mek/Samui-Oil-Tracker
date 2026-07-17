@@ -89,6 +89,9 @@ export default async function DashboardPage() {
       latestRecord,
       firstDate: stationRecords[0]?.record_date ?? '-',
       lastDate: latestRecord?.record_date ?? '-',
+      // ยอดสะสมตลอดช่วงข้อมูล (วันแรกที่มีข้อมูลตั้งต้น ถึงวันล่าสุด)
+      receivedTotal: stationRecords.reduce((sum, record) => sum + record.received_liters, 0),
+      dispatchedTotal: stationRecords.reduce((sum, record) => sum + record.dispatched_liters, 0),
       received30: recentByStation(station.id, 30).reduce((sum, record) => sum + record.received_liters, 0),
       dispatched30: recentByStation(station.id, 30).reduce((sum, record) => sum + record.dispatched_liters, 0),
       sourceText: Object.entries(sourceCounts)
@@ -201,13 +204,15 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="table-shell">
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="w-full min-w-[1120px] text-sm">
             <thead>
               <tr className="table-header">
                 <th className="px-3 py-2 text-left">พื้นที่</th>
                 <th className="px-3 py-2 text-right">Record</th>
                 <th className="px-3 py-2 text-left">ช่วงข้อมูล</th>
                 <th className="px-3 py-2 text-right">คงเหลือล่าสุด</th>
+                <th className="px-3 py-2 text-right">รับสะสมทั้งหมด</th>
+                <th className="px-3 py-2 text-right">ใช้สะสมทั้งหมด</th>
                 <th className="px-3 py-2 text-right">รับ 30 วัน</th>
                 <th className="px-3 py-2 text-right">ใช้ 30 วัน</th>
                 <th className="px-3 py-2 text-left">แหล่งข้อมูล</th>
@@ -224,6 +229,8 @@ export default async function DashboardPage() {
                   <td className="px-3 py-2 text-right tabular-nums">
                     {Math.round(summary.latestRecord?.closing_liters ?? 0).toLocaleString('th-TH')}
                   </td>
+                  <td className="px-3 py-2 text-right font-bold tabular-nums text-emerald-700">{Math.round(summary.receivedTotal).toLocaleString('th-TH')}</td>
+                  <td className="px-3 py-2 text-right font-bold tabular-nums text-amber-700">{Math.round(summary.dispatchedTotal).toLocaleString('th-TH')}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{Math.round(summary.received30).toLocaleString('th-TH')}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{Math.round(summary.dispatched30).toLocaleString('th-TH')}</td>
                   <td className="px-3 py-2 text-slate-600">{summary.sourceText || '-'}</td>
@@ -231,7 +238,7 @@ export default async function DashboardPage() {
               ))}
               {stationSummaries.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={9} className="px-3 py-8 text-center text-slate-500">
                     ยังไม่มีข้อมูลในฐานข้อมูล
                   </td>
                 </tr>
