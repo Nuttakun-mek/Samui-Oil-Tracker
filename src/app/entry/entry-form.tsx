@@ -5,6 +5,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Paperclip } from 'lucide-react';
 import { STATION_LABEL, computeClosing, fuelRecordEntrySchema, type FuelRecordFormValues, type Station } from '@/lib/types/domain';
+import { formatThaiDateCompact } from '@/lib/format/thai-date';
 import { DatePicker } from '@/components/ui/date-picker';
 import { NumberInput } from '@/components/ui/number-input';
 import { uploadRecordDocument } from '../documents/actions';
@@ -115,7 +116,7 @@ export default function EntryForm({ stations, entryLocked = false }: { stations:
           setAttachments([]);
           if (attachmentInputRef.current) attachmentInputRef.current.value = '';
         }
-        setToast(`บันทึกข้อมูล ${STATION_LABEL[values.station_id]} วันที่ ${values.record_date} เรียบร้อย${attachmentNote}`);
+        setToast(`บันทึกข้อมูล ${STATION_LABEL[values.station_id]} วันที่ ${formatThaiDateCompact(values.record_date)} เรียบร้อย${attachmentNote}`);
         reset({
           ...values,
           received_liters: 0,
@@ -218,7 +219,7 @@ export default function EntryForm({ stations, entryLocked = false }: { stations:
                   : previousDate
                     ? previousSameDay
                       ? 'ยกยอดต่อจากเที่ยวล่าสุดของวันเดียวกัน'
-                      : `จากยอดปิดวันที่ ${previousDate}`
+                      : `จากยอดปิดวันที่ ${formatThaiDateCompact(previousDate)}`
                     : 'ไม่พบยอดปิดก่อนหน้า'}
             </p>
           </div>

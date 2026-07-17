@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, PlusCircle, Trash2 } from 'lucide-react';
 import type { ProcurementGroupSummary, ProcurementSummary } from '@/lib/procurement';
+import { formatThaiDateCompact } from '@/lib/format/thai-date';
 import { setGroupBaseline, addProcurementLot, deleteProcurementLot, uploadContractDocument } from './procurement-actions';
 import { ContractDocuments } from './contract-documents';
 
@@ -107,7 +108,7 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
             )}
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            ยอดเริ่มต้น {group.baseline.liters.toLocaleString('th-TH')} ลิตร ณ {group.baseline.date} · เติมมาแล้ว {group.contractsCount}{' '}
+            ยอดเริ่มต้น {group.baseline.liters.toLocaleString('th-TH')} ลิตร ณ {formatThaiDateCompact(group.baseline.date)} · เติมมาแล้ว {group.contractsCount}{' '}
             ครั้ง รวม {group.contractsSum.toLocaleString('th-TH')} ลิตร · รับเข้าแล้ว {group.receivedSum.toLocaleString('th-TH')} ลิตร
           </p>
         </div>
@@ -239,7 +240,7 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
               )}
               {group.contracts.map((lot) => (
                 <tr key={lot.id} className="border-t border-slate-200">
-                  <td className="px-3 py-2 whitespace-nowrap">{lot.contractDate ?? '-'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{lot.contractDate ? formatThaiDateCompact(lot.contractDate) : '-'}</td>
                   <td className="px-3 py-2 font-semibold text-slate-900">
                     {lot.contractCode}
                     {lot.documentNo ? ` / ${lot.documentNo}` : ''}
@@ -314,7 +315,7 @@ export function ProcurementPanel({ summary }: { summary: ProcurementSummary }) {
               )}
               {summary.legacyContracts.map((c) => (
                 <tr key={c.id} className="border-t border-slate-200">
-                  <td className="px-3 py-2 whitespace-nowrap">{c.contractDate ?? '-'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{c.contractDate ? formatThaiDateCompact(c.contractDate) : '-'}</td>
                   <td className="px-3 py-2 font-semibold text-slate-900">
                     {c.contractCode}
                     {c.documentNo ? ` / ${c.documentNo}` : ''}

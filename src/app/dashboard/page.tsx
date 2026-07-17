@@ -10,7 +10,7 @@ import { getCurrentUserAccess, requirePageAccess } from '@/lib/auth/server';
 import { estimatedFuelCost } from '@/lib/analytics/fuel';
 import { computeStationInsights } from '@/lib/analytics/station-insight';
 import { LowStockBanner } from '@/components/low-stock-banner';
-import { formatThaiDate } from '@/lib/format/thai-date';
+import { formatThaiDate, formatThaiDateCompact } from '@/lib/format/thai-date';
 import { ProcurementBalanceCard } from '@/components/procurement-balance-card';
 import { getProcurementSummary } from '@/lib/procurement';
 import Link from 'next/link';
@@ -111,7 +111,7 @@ export default async function DashboardPage() {
         </div>
         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 shadow-sm">
           ข้อมูลจากฐาน {recordList.length.toLocaleString('th-TH')} record
-          {latestRecordDate ? ` ล่าสุด ${latestRecordDate}` : ''}
+          {latestRecordDate ? ` ล่าสุด ${formatThaiDateCompact(latestRecordDate)}` : ''}
         </div>
       </div>
 
@@ -162,6 +162,7 @@ export default async function DashboardPage() {
               etaDate={insight.etaDate}
               lowStockDays={st.low_stock_days}
               safetyStock={insight.safetyStock}
+              latestRecordDate={insight.latestRecordDate}
             />
           );
         })}
@@ -178,7 +179,8 @@ export default async function DashboardPage() {
             <div key={summary.station.id} className="panel border-t-4 border-t-brand-600">
               <div className="text-sm font-extrabold text-slate-950">{summary.station.name}</div>
               <div className="mt-0.5 text-xs text-slate-500">
-                ข้อมูล {summary.firstDate} ถึง {summary.lastDate} · {summary.records.length.toLocaleString('th-TH')} รายการ
+                ข้อมูล {summary.firstDate === '-' ? '-' : formatThaiDateCompact(summary.firstDate)} ถึง{' '}
+                {summary.lastDate === '-' ? '-' : formatThaiDateCompact(summary.lastDate)} · {summary.records.length.toLocaleString('th-TH')} รายการ
               </div>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div className="rounded-md bg-emerald-50 px-3 py-2.5">
@@ -249,7 +251,7 @@ export default async function DashboardPage() {
             <p className="text-sm text-slate-500">สรุปตามพื้นที่จากตาราง fuel_records ที่ระบบใช้สร้างกราฟและ KPI</p>
           </div>
           <div className="text-xs font-semibold text-slate-500">
-            {recordList.length ? `${recordList[0].record_date} ถึง ${latestRecordDate}` : 'ไม่มีข้อมูล'}
+            {recordList.length ? `${formatThaiDateCompact(recordList[0].record_date)} ถึง ${formatThaiDateCompact(latestRecordDate!)}` : 'ไม่มีข้อมูล'}
           </div>
         </div>
         <div className="table-shell">
@@ -273,7 +275,8 @@ export default async function DashboardPage() {
                   <td className="px-3 py-2 font-bold text-slate-900">{summary.station.name}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{summary.records.length.toLocaleString('th-TH')}</td>
                   <td className="px-3 py-2 whitespace-nowrap tabular-nums">
-                    {summary.firstDate} ถึง {summary.lastDate}
+                    {summary.firstDate === '-' ? '-' : formatThaiDateCompact(summary.firstDate)} ถึง{' '}
+                    {summary.lastDate === '-' ? '-' : formatThaiDateCompact(summary.lastDate)}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {Math.round(summary.latestRecord?.closing_liters ?? 0).toLocaleString('th-TH')}

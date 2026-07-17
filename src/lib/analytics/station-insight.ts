@@ -11,6 +11,7 @@ export interface StationInsight {
   received: number;
   dispatched: number;
   closing: number;
+  latestRecordDate: string | null;
   averageDaily: number;
   safetyStock: number;
   belowSafetyStock: boolean;
@@ -79,6 +80,7 @@ export function computeStationInsight(
     received,
     dispatched,
     closing: latest?.closing_liters ?? 0,
+    latestRecordDate: latest?.record_date ?? null,
     averageDaily,
     safetyStock,
     belowSafetyStock,

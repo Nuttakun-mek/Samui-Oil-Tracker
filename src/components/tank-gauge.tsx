@@ -1,4 +1,13 @@
+import { AlertCircle } from 'lucide-react';
 import { formatThaiDate } from '@/lib/format/thai-date';
+
+// นับจำนวนวันนับจากวันที่บันทึกล่าสุดถึงวันนี้ — ใช้บอกว่าข้อมูลที่เห็นเป็นปัจจุบันแค่ไหน
+function daysSince(isoDate: string) {
+  const latest = new Date(`${isoDate}T00:00:00`);
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((todayMidnight.getTime() - latest.getTime()) / (24 * 60 * 60 * 1000));
+}
 
 export function TankGauge({
   label,
@@ -10,6 +19,7 @@ export function TankGauge({
   etaDate,
   lowStockDays,
   safetyStock = 0,
+  latestRecordDate = null,
 }: {
   label: string;
   liters: number;
@@ -20,6 +30,7 @@ export function TankGauge({
   etaDate: string | null;
   lowStockDays: number;
   safetyStock?: number;
+  latestRecordDate?: string | null;
 }) {
   const clamped = Math.max(0, Math.min(100, pct));
   const belowSafetyStock = safetyStock > 0 && liters < safetyStock;
@@ -36,6 +47,8 @@ export function TankGauge({
   }[status];
   // จำนวนวันเหลือยังเตือนตามเกณฑ์วัน (คนละเรื่องกับสัดส่วนถัง — ถังเกือบเต็มแต่ใช้เร็วก็หมดไวได้)
   const daysCritical = daysRemaining !== null && daysRemaining < lowStockDays;
+  const staleDays = latestRecordDate ? daysSince(latestRecordDate) : null;
+  const isStale = staleDays !== null && staleDays >= 2;
 
   return (
     <div className="panel">
@@ -43,6 +56,13 @@ export function TankGauge({
         <div className="min-w-0">
           <div className="text-sm font-extrabold leading-5 text-slate-950">{label}</div>
           <div className="mt-0.5 text-xs text-slate-500">ความจุ {Math.round(capacity).toLocaleString('th-TH')} ลิตร</div>
+          {latestRecordDate && (
+            <div className={`mt-1 flex items-center gap-1 text-[11px] font-semibold ${isStale ? 'text-amber-700' : 'text-slate-400'}`}>
+              {isStale && <AlertCircle size={11} aria-hidden="true" />}
+              ข้อมูลล่าสุด {formatThaiDate(latestRecordDate)}
+              {staleDays === 0 ? ' (วันนี้)' : staleDays === 1 ? ' (เมื่อวาน)' : ` (${staleDays} วันที่แล้ว)`}
+            </div>
+          )}
         </div>
         <span className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold ${statusClass}`}>
           {statusText}

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AlertTriangle, Fuel } from 'lucide-react';
 import type { ProcurementGroupSummary } from '@/lib/procurement';
+import { formatThaiDateCompact } from '@/lib/format/thai-date';
 
 function formatLiters(value: number) {
   return value.toLocaleString('th-TH', { maximumFractionDigits: 0 });
@@ -43,7 +44,7 @@ function GroupCard({ group, isAdmin }: { group: ProcurementGroupSummary; isAdmin
         {formatLiters(group.balance ?? 0)} <small className="text-sm font-semibold text-slate-500">ลิตรคงเหลือ</small>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-        <span>ยอดเริ่มต้น {formatLiters(group.baseline.liters)} ลิตร ({group.baseline.date})</span>
+        <span>ยอดเริ่มต้น {formatLiters(group.baseline.liters)} ลิตร ({formatThaiDateCompact(group.baseline.date)})</span>
         <span className="text-emerald-700">+ เติมล๊อต {group.contractsCount.toLocaleString('th-TH')} ครั้ง รวม {formatLiters(group.contractsSum)} ลิตร</span>
         <span className="text-amber-700">− รับเข้าแล้ว {formatLiters(group.receivedSum)} ลิตร</span>
       </div>
