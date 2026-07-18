@@ -1,5 +1,6 @@
 import { AlertCircle } from 'lucide-react';
 import { formatThaiDate } from '@/lib/format/thai-date';
+import type { StationStatus } from '@/lib/analytics/station-insight';
 
 // นับจำนวนวันนับจากวันที่บันทึกล่าสุดถึงวันนี้ — ใช้บอกว่าข้อมูลที่เห็นเป็นปัจจุบันแค่ไหน
 function daysSince(isoDate: string) {
@@ -17,9 +18,9 @@ export function TankGauge({
   averageDailyUsage,
   daysRemaining,
   etaDate,
-  lowStockDays,
   safetyStock = 0,
   latestRecordDate = null,
+  status,
 }: {
   label: string;
   liters: number;
@@ -28,25 +29,26 @@ export function TankGauge({
   averageDailyUsage: number;
   daysRemaining: number | null;
   etaDate: string | null;
-  lowStockDays: number;
   safetyStock?: number;
   latestRecordDate?: string | null;
+  status: StationStatus;
 }) {
   const clamped = Math.max(0, Math.min(100, pct));
   const belowSafetyStock = safetyStock > 0 && liters < safetyStock;
   const safetyPct = capacity > 0 ? Math.max(0, Math.min(100, (safetyStock / capacity) * 100)) : 0;
-  // สีตามสัดส่วนน้ำมันในถัง: มากกว่า 60% เขียว, มากกว่า 40% เหลือง, ต่ำกว่านั้นแดง
-  // — แต่ถ้าคงเหลือต่ำกว่า safety stock ให้ถือเป็นวิกฤตทันทีไม่ว่าสัดส่วนเท่าไหร่
-  const status = belowSafetyStock ? 'danger' : clamped > 60 ? 'ok' : clamped > 40 ? 'warn' : 'danger';
-  const fillColor = { ok: '#15803D', warn: '#C69214', danger: '#B23A1B' }[status];
-  const statusText = { ok: 'ปกติ', warn: 'เฝ้าระวัง', danger: 'วิกฤต' }[status];
+  // แถบสีในการ์ด: ยังไล่ตามสัดส่วนน้ำมันในถัง (มากกว่า 60% เขียว, มากกว่า 40% เหลือง, ต่ำกว่านั้นแดง)
+  // เพื่อความสวยงาม/เห็นสัดส่วนชัด — แต่ "ป้ายสถานะ" ด้านล่างใช้เกณฑ์จำนวนวันคงเหลือ (เดียวกับ Dashboard banner และ PDF)
+  // ไม่ใช้ % ตัดสิน เพราะถังเกือบเต็มแต่ใช้เร็วก็วิกฤตได้ — ถ้าใช้กันคนละเกณฑ์ ป้ายจะขัดกันเองระหว่างหน้าต่างๆ
+  const fillStatus = belowSafetyStock ? 'danger' : clamped > 60 ? 'ok' : clamped > 40 ? 'warn' : 'danger';
+  const fillColor = { ok: '#15803D', warn: '#C69214', danger: '#B23A1B' }[fillStatus];
+  const statusText = { ok: 'ปกติ', warn: 'เฝ้าระวัง', danger: 'วิกฤต', unknown: 'ไม่มีข้อมูล' }[status];
   const statusClass = {
     ok: 'bg-emerald-50 text-emerald-700',
     warn: 'bg-gold-50 text-gold-700',
     danger: 'bg-red-50 text-red-700',
+    unknown: 'bg-slate-100 text-slate-600',
   }[status];
-  // จำนวนวันเหลือยังเตือนตามเกณฑ์วัน (คนละเรื่องกับสัดส่วนถัง — ถังเกือบเต็มแต่ใช้เร็วก็หมดไวได้)
-  const daysCritical = daysRemaining !== null && daysRemaining < lowStockDays;
+  const daysCritical = status === 'danger';
   const staleDays = latestRecordDate ? daysSince(latestRecordDate) : null;
   const isStale = staleDays !== null && staleDays >= 2;
 

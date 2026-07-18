@@ -385,8 +385,8 @@ export function DashboardAnalytics({ stations, records }: { stations: Station[];
           <div className={`grid gap-3 ${stationInsights.length > 1 ? 'xl:grid-cols-3' : ''}`}>
             {stationInsights.map((item) => {
               const label = STATION_SHORT[item.station.id];
-              const statusLabel = item.status === 'danger' ? 'วิกฤต' : item.status === 'warn' ? 'เฝ้าระวัง' : 'ปกติ';
-              const statusClass = item.status === 'danger' ? 'bg-red-50 text-red-700' : item.status === 'warn' ? 'bg-gold-50 text-gold-700' : 'bg-brand-50 text-brand-700';
+              const statusLabel = item.status === 'danger' ? 'วิกฤต' : item.status === 'warn' ? 'เฝ้าระวัง' : item.status === 'unknown' ? 'ไม่มีข้อมูล' : 'ปกติ';
+              const statusClass = item.status === 'danger' ? 'bg-red-50 text-red-700' : item.status === 'warn' ? 'bg-gold-50 text-gold-700' : item.status === 'unknown' ? 'bg-slate-100 text-slate-600' : 'bg-brand-50 text-brand-700';
               return (
                 <article key={item.station.id} className={`rounded-lg border border-slate-200 border-t-4 ${label.cardAccent} bg-white p-4 shadow-sm`}>
                   <div className="flex items-start justify-between gap-3">

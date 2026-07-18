@@ -2,7 +2,7 @@ import type { FuelRecord, Station, StationId } from '@/lib/types/domain';
 import { formatThaiDateShort, formatThaiMonth } from '@/lib/format/thai-date';
 import { estimatedFuelCost } from './fuel';
 
-export type StationStatus = 'ok' | 'warn' | 'danger';
+export type StationStatus = 'ok' | 'warn' | 'danger' | 'unknown';
 export type PeriodMode = 'daily' | 'monthly';
 
 export interface StationInsight {
@@ -67,12 +67,16 @@ export function computeStationInsight(
     null
   );
   const belowSafetyStock = safetyStock > 0 && latest !== null && latest.closing_liters < safetyStock;
+  // ไม่มีข้อมูลเลยในช่วงที่พิจารณา (เช่น PDF ที่กรองตามช่วงวันที่ซึ่งสถานีนี้ไม่มีบันทึก) ต้องแยกจาก "ปกติ"
+  // เพราะ "ไม่มีข้อมูล" ไม่ใช่หลักฐานว่าไม่มีปัญหา — ถ้า default เป็น ok จะดูเหมือนสถานีนี้สบายดีทั้งที่แค่ไม่มีข้อมูลให้ประเมิน
   const status: StationStatus =
-    belowSafetyStock || (daysRemaining !== null && daysRemaining < station.low_stock_days)
-      ? 'danger'
-      : daysRemaining !== null && daysRemaining < station.low_stock_days * 1.5
-        ? 'warn'
-        : 'ok';
+    latest === null
+      ? 'unknown'
+      : belowSafetyStock || (daysRemaining !== null && daysRemaining < station.low_stock_days)
+        ? 'danger'
+        : daysRemaining !== null && daysRemaining < station.low_stock_days * 1.5
+          ? 'warn'
+          : 'ok';
 
   return {
     station,

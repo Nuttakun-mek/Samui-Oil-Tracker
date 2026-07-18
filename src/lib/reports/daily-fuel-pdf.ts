@@ -33,8 +33,8 @@ const COLUMNS: Column[] = [
   { label: 'แหล่งข้อมูล', width: TABLE_WIDTH - 664 },
 ];
 
-const STATUS_LABEL: Record<StationInsight['status'], string> = { danger: 'วิกฤต', warn: 'เฝ้าระวัง', ok: 'ปกติ' };
-const STATUS_COLOR: Record<StationInsight['status'], string> = { danger: '#b91c1c', warn: '#a16207', ok: '#0f766e' };
+const STATUS_LABEL: Record<StationInsight['status'], string> = { danger: 'วิกฤต', warn: 'เฝ้าระวัง', ok: 'ปกติ', unknown: 'ไม่มีข้อมูล' };
+const STATUS_COLOR: Record<StationInsight['status'], string> = { danger: '#b91c1c', warn: '#a16207', ok: '#0f766e', unknown: '#64748b' };
 
 function number(value: number) {
   return Math.round(value).toLocaleString('th-TH');
@@ -324,7 +324,7 @@ export function createDailyFuelPdf(
         doc.fillColor('#722257').fontSize(16).text(STATION_LABEL[station.id], MARGIN, MARGIN, { width: TABLE_WIDTH - 110 });
         doc.fontSize(9).fillColor('#475569').text(`ภาพรวมและกราฟวิเคราะห์  ·  ${formatThaiDate(from)} ถึง ${formatThaiDate(to)}`, MARGIN, MARGIN + 24);
         doc.roundedRect(PAGE_WIDTH - MARGIN - 92, MARGIN, 92, 24, 4).fillAndStroke(
-          insight.status === 'danger' ? '#fef2f2' : insight.status === 'warn' ? '#fffbeb' : '#ecfdf5',
+          insight.status === 'danger' ? '#fef2f2' : insight.status === 'warn' ? '#fffbeb' : insight.status === 'unknown' ? '#f1f5f9' : '#ecfdf5',
           STATUS_COLOR[insight.status]
         );
         doc.fontSize(8).fillColor(STATUS_COLOR[insight.status]).text(`สถานะ: ${STATUS_LABEL[insight.status]}`, PAGE_WIDTH - MARGIN - 86, MARGIN + 7, { width: 80, align: 'center' });

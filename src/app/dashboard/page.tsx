@@ -160,9 +160,9 @@ export default async function DashboardPage() {
               averageDailyUsage={insight.averageDaily}
               daysRemaining={insight.daysRemaining}
               etaDate={insight.etaDate}
-              lowStockDays={st.low_stock_days}
               safetyStock={insight.safetyStock}
               latestRecordDate={insight.latestRecordDate}
+              status={insight.status}
             />
           );
         })}

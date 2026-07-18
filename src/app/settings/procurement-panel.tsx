@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, PlusCircle, Trash2 } from 'lucide-react';
 import type { ProcurementGroupSummary, ProcurementSummary } from '@/lib/procurement';
 import { formatThaiDateCompact } from '@/lib/format/thai-date';
+import { NumberInput } from '@/components/ui/number-input';
 import { setGroupBaseline, addProcurementLot, deleteProcurementLot, uploadContractDocument } from './procurement-actions';
 import { ContractDocuments } from './contract-documents';
 
@@ -49,6 +50,16 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
   const lotFileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
+  // ตัวเลขก้อนใหญ่ (ยอดตั้งต้น/เกณฑ์แจ้งเตือน/จำนวนล๊อต) ใช้ NumberInput ที่มีลูกน้ำคั่นหลักขณะพิมพ์
+  // เพื่อกันพิมพ์ผิดหลัก (เผลอใส่/ขาดเลข 0) เพราะเป็นตัวเลขสำคัญที่กระทบยอดคงเหลือของทั้งกลุ่มทันที
+  const [baselineLiters, setBaselineLiters] = useState(group.baseline?.liters ?? 0);
+  const [warnBelowLiters, setWarnBelowLiters] = useState(group.baseline?.warnBelowLiters ?? 0);
+  const [quantityLiters, setQuantityLiters] = useState(0);
+  useEffect(() => {
+    setBaselineLiters(group.baseline?.liters ?? 0);
+    setWarnBelowLiters(group.baseline?.warnBelowLiters ?? 0);
+  }, [group.baseline?.liters, group.baseline?.warnBelowLiters]);
+
   const onLotSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -72,6 +83,7 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
       setLotSuccess(true);
       setLotMessage(message);
       form.reset();
+      setQuantityLiters(0);
       router.refresh();
       setTimeout(() => setLotMessage(null), 4000);
     });
@@ -133,7 +145,8 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="field-label">ยอดคงเหลือเริ่มต้น (ลิตร)</label>
-              <input name="baseline_liters" type="number" min="0" step="1" defaultValue={group.baseline?.liters ?? ''} className="field" required />
+              <NumberInput value={baselineLiters} onChange={setBaselineLiters} />
+              <input type="hidden" name="baseline_liters" value={baselineLiters} />
             </div>
             <div>
               <label className="field-label">วันที่อ้างอิง</label>
@@ -141,15 +154,8 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
             </div>
             <div>
               <label className="field-label">แจ้งเตือนเมื่อคงเหลือต่ำกว่า (ลิตร)</label>
-              <input
-                name="warn_below_liters"
-                type="number"
-                min="0"
-                step="1"
-                defaultValue={group.baseline?.warnBelowLiters ?? ''}
-                className="field"
-                required
-              />
+              <NumberInput value={warnBelowLiters} onChange={setWarnBelowLiters} />
+              <input type="hidden" name="warn_below_liters" value={warnBelowLiters} />
             </div>
             <div>
               <label className="field-label">หมายเหตุ</label>
@@ -184,7 +190,8 @@ function GroupPanel({ group }: { group: ProcurementGroupSummary }) {
             </div>
             <div>
               <label className="field-label">จำนวน (ลิตร)</label>
-              <input name="quantity_liters" type="number" min="1" step="1" className="field" required />
+              <NumberInput value={quantityLiters} onChange={setQuantityLiters} />
+              <input type="hidden" name="quantity_liters" value={quantityLiters} />
             </div>
             <div>
               <label className="field-label">วันที่สัญญา</label>
