@@ -52,12 +52,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const defaultFrom = `${latestDate.slice(0, 7)}-01`;
   const from = asDate(params.from) ?? defaultFrom;
   const to = asDate(params.to) ?? latestDate;
-  const requestedStation = Array.isArray(params.station) ? params.station[0] : params.station;
-  const selectedStation = requestedStation && visibleStationIds.includes(requestedStation as StationId) ? requestedStation : 'all';
-  const selectedStationIds = selectedStation === 'all' ? visibleStationIds : [selectedStation as StationId];
+  // station รับได้ทั้ง 'all', พื้นที่เดียว, หรือหลายพื้นที่คั่นด้วยจุลภาค (เช่น 'samui,koh_tao') — ให้เลือก 1 / 2 / ทั้งหมดได้
+  const requestedStationParam = Array.isArray(params.station) ? params.station[0] : params.station;
+  const requestedStationIds =
+    requestedStationParam && requestedStationParam !== 'all'
+      ? requestedStationParam.split(',').filter((id): id is StationId => visibleStationIds.includes(id as StationId))
+      : [];
+  const selectedStationIds = requestedStationIds.length ? requestedStationIds : visibleStationIds;
+  const selectedStation = requestedStationParam ?? 'all';
 
   const [{ data: stations }, { data: records }] = await Promise.all([
-    supabase.from('stations').select('*').in('id', visibleStationIds).order('name'),
+    supabase.from('stations').select('*').in('id', selectedStationIds).order('name'),
     supabase
       .from('fuel_records')
       .select('*')
@@ -92,7 +97,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <ReportFilter initialFrom={from} initialTo={to} initialStation={selectedStation} stations={stationList} />
 
       <div className="flex flex-col gap-1 border-l-4 border-brand-600 bg-brand-50 px-4 py-3 text-sm text-brand-950 sm:flex-row sm:items-center sm:justify-between">
-        <span className="font-bold">{selectedStation === 'all' ? 'มุมมองรวมทั้ง 3 พื้นที่' : STATION_LABEL[selectedStation as StationId]}</span>
+        <span className="font-bold">
+          {selectedStationIds.length === STATION_IDS.length
+            ? 'มุมมองรวมทั้ง 3 พื้นที่'
+            : selectedStationIds.map((id) => STATION_LABEL[id]).join(' + ')}
+        </span>
         <span className="text-xs leading-5 text-brand-700">PDF หน้าแรกเป็นสรุปรวม และแต่ละพื้นที่เริ่มในหน้าใหม่</span>
       </div>
 

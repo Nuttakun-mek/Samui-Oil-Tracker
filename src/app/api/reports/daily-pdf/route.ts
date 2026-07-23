@@ -33,10 +33,13 @@ export async function GET(request: NextRequest) {
     supabase = await createClient();
     visibleStationIds = access.stationIds;
   }
+  // station รับได้ทั้ง 'all', พื้นที่เดียว, หรือหลายพื้นที่คั่นด้วยจุลภาค (เช่น 'samui,koh_tao') — ให้เลือก 1 / 2 / ทั้งหมดได้
   const requestedStation = request.nextUrl.searchParams.get('station');
-  const stationIds = requestedStation && visibleStationIds.includes(requestedStation as StationId)
-    ? [requestedStation as StationId]
-    : visibleStationIds;
+  const requestedStationIds =
+    requestedStation && requestedStation !== 'all'
+      ? requestedStation.split(',').filter((id): id is StationId => visibleStationIds.includes(id as StationId))
+      : [];
+  const stationIds = requestedStationIds.length ? requestedStationIds : visibleStationIds;
   const forceDailyChart = request.nextUrl.searchParams.get('chartMode') === 'daily';
 
   const [{ data: stations }, { data: records, error }, procurement] = await Promise.all([
@@ -49,7 +52,7 @@ export async function GET(request: NextRequest) {
   try {
     const thaiFont = await readFile(path.join(process.cwd(), 'public', 'fonts', 'Sarabun-Regular.ttf'));
     const pdf = await createDailyFuelPdf((stations ?? []) as Station[], (records ?? []) as FuelRecord[], from, to, thaiFont, { forceDailyChart, procurement });
-    const scope = stationIds.length === 1 ? stationIds[0] : 'all-stations';
+    const scope = stationIds.length === visibleStationIds.length ? 'all-stations' : stationIds.join('-');
     return new Response(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',

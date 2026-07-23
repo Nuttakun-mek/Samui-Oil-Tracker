@@ -112,7 +112,10 @@ function drawExecutiveSummary(
   periodMode: PeriodMode
 ) {
   doc.fillColor('#0f172a').fontSize(18).text('รายงานสรุปภาพรวมการใช้น้ำมัน', MARGIN, MARGIN);
-  const scopeLabel = stations.length === 1 ? STATION_LABEL[stations[0].id] : 'ทุกพื้นที่';
+  const scopeLabel =
+    stations.length === STATION_IDS.length
+      ? 'ทุกพื้นที่'
+      : stations.map((item) => STATION_LABEL[item.id]).join(', ');
   doc.fontSize(10).fillColor('#475569').text(`${formatThaiDate(from)} ถึง ${formatThaiDate(to)}  ·  ขอบเขต: ${scopeLabel}`, MARGIN, MARGIN + 24);
 
   const totalReceived = records.reduce((sum, record) => sum + record.received_liters, 0);
