@@ -61,8 +61,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const selectedStationIds = requestedStationIds.length ? requestedStationIds : visibleStationIds;
   const selectedStation = requestedStationParam ?? 'all';
 
-  const [{ data: stations }, { data: records }] = await Promise.all([
-    supabase.from('stations').select('*').in('id', selectedStationIds).order('name'),
+  const [{ data: allStations }, { data: records }] = await Promise.all([
+    // ต้องดึง "ทุก" พื้นที่ที่บัญชีนี้เข้าถึงได้เสมอ (ไม่ใช่แค่ที่เลือกไว้ตอนนี้) เพราะรายการนี้ส่งต่อให้ตัวเลือกพื้นที่ใน
+    // ReportFilter ใช้เป็นรายการทั้งหมดที่เลือกได้ — ถ้ากรองแค่พื้นที่ที่เลือกไว้ ตัวเลือกจะ "มองไม่เห็น" พื้นที่ที่ไม่ได้เลือก
+    // แล้วเข้าใจผิดว่า (พื้นที่ที่เลือก) = (พื้นที่ทั้งหมดที่มี) จนส่งค่า station=all ตอนกด export ทั้งที่เลือกไว้ไม่ครบ
+    supabase.from('stations').select('*').in('id', visibleStationIds).order('name'),
     supabase
       .from('fuel_records')
       .select('*')
@@ -74,7 +77,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .order('station_id'),
   ]);
 
-  const stationList = ((stations ?? []) as Station[]).sort((a, b) => STATION_IDS.indexOf(a.id) - STATION_IDS.indexOf(b.id));
+  const allStationList = ((allStations ?? []) as Station[]).sort((a, b) => STATION_IDS.indexOf(a.id) - STATION_IDS.indexOf(b.id));
+  const stationList = allStationList.filter((station) => selectedStationIds.includes(station.id));
   const recordList = (records ?? []) as FuelRecord[];
   const received = recordList.reduce((sum, record) => sum + record.received_liters, 0);
   const dispatched = recordList.reduce((sum, record) => sum + record.dispatched_liters, 0);
@@ -94,7 +98,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </div>
       </div>
 
-      <ReportFilter initialFrom={from} initialTo={to} initialStation={selectedStation} stations={stationList} />
+      <ReportFilter initialFrom={from} initialTo={to} initialStation={selectedStation} stations={allStationList} />
 
       <div className="flex flex-col gap-1 border-l-4 border-brand-600 bg-brand-50 px-4 py-3 text-sm text-brand-950 sm:flex-row sm:items-center sm:justify-between">
         <span className="font-bold">
