@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Image as ImageIcon, Loader2, Paperclip, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Image as ImageIcon, Loader2, Paperclip, Trash2, Upload, X } from 'lucide-react';
 
 export interface AttachedDocument {
   id: string;
@@ -44,6 +44,7 @@ export function DocumentAttachments<T extends AttachedDocument>({
   const [documents, setDocuments] = useState<T[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [preview, setPreview] = useState<{ url: string; fileName: string; mimeType: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -56,6 +57,7 @@ export function DocumentAttachments<T extends AttachedDocument>({
   const onOpen = () => {
     setOpen(true);
     setMessage(null);
+    setPreview(null);
     if (!documents) startTransition(refresh);
   };
 
@@ -78,12 +80,25 @@ export function DocumentAttachments<T extends AttachedDocument>({
     });
   };
 
-  const onView = (documentId: string) => {
+  const onView = (doc: T) => {
     startTransition(async () => {
-      const result = await getUrl(documentId);
-      if (result.ok) window.open(result.url, '_blank', 'noopener');
+      const result = await getUrl(doc.id);
+      if (result.ok) setPreview({ url: result.url, fileName: doc.file_name, mimeType: doc.mime_type });
       else setMessage(result.error);
     });
+  };
+
+  // signed URL ของ Supabase Storage อยู่คนละ origin กับแอป — attribute `download` บน <a> เฉยๆ จะถูกเบราว์เซอร์เมิน
+  // (บังคับดาวน์โหลดได้เฉพาะ same-origin) ต้อง fetch เป็น blob แล้วสร้างลิงก์ดาวน์โหลดแบบ same-origin เอง
+  const onDownload = async (url: string, fileName: string) => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(blobUrl);
   };
 
   const onDelete = (documentId: string, fileName: string) => {
@@ -114,7 +129,40 @@ export function DocumentAttachments<T extends AttachedDocument>({
         {shownCount > 0 ? shownCount.toLocaleString('th-TH') : canEdit ? 'แนบ' : '-'}
       </button>
 
-      {open && (
+      {open && preview && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-xl bg-white shadow-2xl sm:rounded-xl">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <button type="button" onClick={() => setPreview(null)} className="btn-secondary !min-h-8 !px-2.5" aria-label="กลับไปที่รายการ">
+                  <ArrowLeft size={15} aria-hidden="true" />
+                </button>
+                <h2 className="truncate text-sm font-extrabold text-slate-950" title={preview.fileName}>{preview.fileName}</h2>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button type="button" onClick={() => onDownload(preview.url, preview.fileName)} className="btn-secondary !min-h-8 !px-2.5" title="ดาวน์โหลด">
+                  <Download size={15} aria-hidden="true" />
+                </button>
+                <button type="button" onClick={() => setOpen(false)} className="btn-secondary !min-h-8 !px-2.5" aria-label="ปิด">
+                  <X size={15} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto bg-slate-100 p-2 sm:p-3">
+              {preview.mimeType.startsWith('image/') ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview.url} alt={preview.fileName} className="mx-auto max-h-[75vh] w-auto max-w-full rounded-md object-contain" />
+              ) : preview.mimeType === 'application/pdf' ? (
+                <iframe src={preview.url} title={preview.fileName} className="h-[75vh] w-full rounded-md border-0 bg-white" />
+              ) : (
+                <p className="py-10 text-center text-sm text-slate-500">ไม่รองรับการแสดงตัวอย่างไฟล์ประเภทนี้ — ใช้ปุ่มดาวน์โหลดด้านบนแทน</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {open && !preview && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4">
           <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-xl bg-white p-4 shadow-2xl sm:rounded-xl sm:p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -155,7 +203,7 @@ export function DocumentAttachments<T extends AttachedDocument>({
                     : <ImageIcon size={18} className="shrink-0 text-brand-600" aria-hidden="true" />}
                   <button
                     type="button"
-                    onClick={() => onView(doc.id)}
+                    onClick={() => onView(doc)}
                     className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-slate-800 underline-offset-2 hover:text-brand-700 hover:underline"
                     title="เปิดดูเอกสาร"
                   >

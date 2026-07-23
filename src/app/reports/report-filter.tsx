@@ -1,10 +1,61 @@
 'use client';
 
-import { Download, Search } from 'lucide-react';
+import { ChevronDown, Download, Search } from 'lucide-react';
 import { useState } from 'react';
 import { STATION_LABEL, type Station, type StationId } from '@/lib/types/domain';
 import { DatePicker } from '@/components/ui/date-picker';
 import { MonthPicker } from '@/components/ui/month-picker';
+import { usePopover } from '@/components/ui/use-popover';
+
+function StationMultiSelect({
+  stations,
+  selected,
+  onToggle,
+}: {
+  stations: Station[];
+  selected: Set<StationId>;
+  onToggle: (id: StationId) => void;
+}) {
+  const { open, setOpen, ref } = usePopover<HTMLDivElement>();
+  const closedLabel =
+    selected.size === 0
+      ? 'ยังไม่ได้เลือกพื้นที่'
+      : selected.size === stations.length
+        ? 'ทุกพื้นที่'
+        : selected.size === 1
+          ? STATION_LABEL[[...selected][0]]
+          : `เลือก ${selected.size} พื้นที่`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="field flex items-center justify-between gap-2 text-left"
+      >
+        <span className={`truncate ${selected.size ? 'text-slate-900' : 'text-slate-400'}`}>{closedLabel}</span>
+        <ChevronDown size={16} className="shrink-0 text-slate-400" aria-hidden="true" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-72 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+          {stations.map((item) => (
+            <label key={item.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-800 hover:bg-brand-50">
+              <input
+                type="checkbox"
+                checked={selected.has(item.id)}
+                onChange={() => onToggle(item.id)}
+                className="h-4 w-4 shrink-0 rounded border-slate-300"
+              />
+              {STATION_LABEL[item.id]}
+            </label>
+          ))}
+          {selected.size === 0 && <p className="mt-1 px-2 text-xs font-semibold text-red-600">เลือกอย่างน้อย 1 พื้นที่</p>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function wholeMonthForRange(from: string, to: string) {
   if (from.slice(0, 7) !== to.slice(0, 7) || !from.endsWith('-01')) return '';
@@ -76,20 +127,7 @@ export function ReportFilter({
         </div>
         <div>
           <span className="field-label">พื้นที่ (เลือกได้มากกว่า 1)</span>
-          <div className="flex min-h-[42px] flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-2">
-            {stations.map((item) => (
-              <label key={item.id} className="flex items-center gap-1.5 text-sm text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={selectedStations.has(item.id)}
-                  onChange={() => toggleStation(item.id)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                {STATION_LABEL[item.id]}
-              </label>
-            ))}
-          </div>
-          {selectedStations.size === 0 && <p className="mt-1 text-xs font-semibold text-red-600">เลือกอย่างน้อย 1 พื้นที่</p>}
+          <StationMultiSelect stations={stations} selected={selectedStations} onToggle={toggleStation} />
         </div>
         <div>
           <label className="field-label" htmlFor="report-from">ตั้งแต่วันที่</label>
